@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Truth or Gate — Digital Circuits Techfest Event</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0D1310;
+    --panel:#161F19;
+    --panel-2:#1D2A22;
+    --copper:#C08A3E;
+    --copper-bright:#E0AC5C;
+    --signal-on:#5FD68A;
+    --signal-off:#3A4740;
+    --danger:#E2574C;
+    --text:#EDEDE3;
+    --text-muted:#93A399;
+    --border:#2A3630;
+    --radius:3px;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--bg);
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 42px 42px;
+    background-position: -1px -1px;
+    color:var(--text);
+    font-family:'Inter', sans-serif;
+    line-height:1.55;
+  }
+  h1,h2,h3{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:600;
+    margin:0;
+    letter-spacing:-0.01em;
+  }
+  .mono{ font-family:'JetBrains Mono', monospace; }
+  a{ color:inherit; }
+  .wrap{ max-width:1080px; margin:0 auto; padding:0 28px; }
+  ::selection{ background:var(--copper); color:#0D1310; }
+
+  :focus-visible{ outline:2px solid var(--copper-bright); outline-offset:2px; }
+
+  /* ---------- NAV ---------- */
+  nav{
+    position:sticky; top:0; z-index:50;
+    background:rgba(13,19,16,0.9);
+    backdrop-filter: blur(8px);
+    border-bottom:1px solid var(--border);
+  }
+  nav .wrap{ display:flex; align-items:center; justify-content:space-between; height:64px; }
+  .brand{ display:flex; align-items:center; gap:10px; font-family:'Space Grotesk'; font-size:1.05rem; font-weight:700; }
+  .brand-dot{ width:9px; height:9px; border-radius:50%; background:var(--signal-on); box-shadow:0 0 8px var(--signal-on); }
+  .navlinks{ display:flex; gap:28px; font-size:0.92rem; }
+  .navlinks a{ text-decoration:none; color:var(--text-muted); transition:color .15s; }
+  .navlinks a:hover{ color:var(--text); }
+  .nav-cta{
+    background:var(--copper); color:#161006; padding:8px 16px; border-radius:var(--radius);
+    text-decoration:none; font-weight:600; font-size:0.88rem;
+  }
+
+  /* ---------- HERO ---------- */
+  header.hero{ padding:76px 0 60px; }
+  .hero-grid{ display:grid; grid-template-columns:1.1fr 1fr; gap:56px; align-items:center; }
+  .hero h1{ font-size:3.1rem; line-height:1.06; }
+  .hero p.lede{ margin-top:18px; color:var(--text-muted); font-size:1.08rem; max-width:46ch; }
+  .hero-meta{ display:flex; gap:26px; margin-top:28px; flex-wrap:wrap; }
+  .hero-meta div{ font-size:0.85rem; color:var(--text-muted); }
+  .hero-meta strong{ display:block; color:var(--text); font-family:'Space Grotesk'; font-size:1.05rem; font-weight:600; }
+  .hero-actions{ display:flex; gap:14px; margin-top:32px; }
+  .btn-primary{
+    background:var(--copper); color:#161006; padding:13px 22px; border-radius:var(--radius);
+    text-decoration:none; font-weight:600; font-size:0.95rem; border:none; cursor:pointer;
+    font-family:inherit;
+  }
+  .btn-primary:hover{ background:var(--copper-bright); }
+  .btn-ghost{
+    background:transparent; color:var(--text); padding:13px 22px; border-radius:var(--radius);
+    text-decoration:none; font-weight:500; font-size:0.95rem; border:1px solid var(--border);
+  }
+  .btn-ghost:hover{ border-color:var(--copper); }
+
+  /* ---------- GATE DEMO ---------- */
+  .demo{
+    background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:26px;
+  }
+  .demo-top{ display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+  .demo-label{ font-size:0.78rem; color:var(--text-muted); }
+  select.gate-select{
+    background:var(--panel-2); color:var(--text); border:1px solid var(--border); border-radius:var(--radius);
+    padding:7px 10px; font-family:'JetBrains Mono'; font-size:0.85rem; cursor:pointer;
+  }
+  .switches{ display:flex; gap:30px; justify-content:center; margin:22px 0 18px; }
+  .switch-unit{ text-align:center; }
+  .switch-unit .sw-label{ font-family:'JetBrains Mono'; font-size:0.78rem; color:var(--text-muted); margin-bottom:8px; }
+  .toggle{
+    width:56px; height:30px; border-radius:16px; background:var(--signal-off);
+    position:relative; cursor:pointer; border:1px solid var(--border); transition:background .15s;
+  }
+  .toggle.on{ background:rgba(95,214,138,0.25); border-color:var(--signal-on); }
+  .toggle .knob{
+    width:22px; height:22px; border-radius:50%; background:var(--text-muted);
+    position:absolute; top:3px; left:3px; transition:left .15s, background .15s;
+  }
+  .toggle.on .knob{ left:29px; background:var(--signal-on); box-shadow:0 0 8px var(--signal-on); }
+
+  .gate-flow{ display:flex; align-items:center; justify-content:center; gap:16px; margin:22px 0; }
+  .gate-box{
+    width:78px; height:52px; border:1.5px solid var(--copper); border-radius:4px;
+    display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono';
+    font-weight:700; font-size:0.9rem; color:var(--copper-bright); background:var(--panel-2);
+  }
+  .wire{ width:26px; height:2px; background:var(--border); position:relative; }
+  .wire.live{ background:var(--signal-on); box-shadow:0 0 6px var(--signal-on); }
+  .led{
+    width:34px; height:34px; border-radius:50%; border:2px solid var(--signal-off); background:#0a0f0a;
+    transition:all .15s;
+  }
+  .led.on{ background:var(--signal-on); border-color:var(--signal-on); box-shadow:0 0 18px var(--signal-on); }
+
+  table.truth{ width:100%; border-collapse:collapse; margin-top:16px; font-family:'JetBrains Mono'; font-size:0.85rem; }
+  table.truth th, table.truth td{ padding:7px 4px; text-align:center; border-bottom:1px solid var(--border); color:var(--text-muted); }
+  table.truth th{ color:var(--text); font-weight:500; font-size:0.75rem; }
+  table.truth tr.active-row td{ color:var(--signal-on); font-weight:700; }
+  table.truth tr.active-row{ background:rgba(95,214,138,0.08); }
+
+  /* ---------- SECTION SHARED ---------- */
+  section{ padding:74px 0; border-top:1px solid var(--border); }
+  .section-head{ max-width:60ch; margin-bottom:44px; }
+  .section-head h2{ font-size:2rem; }
+  .section-head p{ color:var(--text-muted); margin-top:12px; font-size:1rem; }
+
+  /* ---------- ROUNDS (circuit path) ---------- */
+  .rounds{ position:relative; }
+  .rounds-track{ display:grid; grid-template-columns:repeat(3, 1fr); gap:0; position:relative; }
+  .rounds-track::before{
+    content:''; position:absolute; top:19px; left:8%; right:8%; height:2px;
+    background:repeating-linear-gradient(90deg, var(--copper) 0 8px, transparent 8px 14px);
+  }
+  .round-node{ position:relative; padding:0 18px; }
+  .round-node:first-child{ padding-left:0; }
+  .round-node:last-child{ padding-right:0; }
+  .node-dot{
+    width:40px; height:40px; border-radius:50%; background:var(--panel); border:2px solid var(--copper);
+    display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono'; font-weight:700;
+    color:var(--copper-bright); margin-bottom:20px; position:relative; z-index:2;
+  }
+  .round-node h3{ font-size:1.2rem; margin-bottom:8px; }
+  .round-node .round-time{ font-family:'JetBrains Mono'; font-size:0.76rem; color:var(--copper); margin-bottom:10px; display:block; }
+  .round-node p{ color:var(--text-muted); font-size:0.92rem; }
+
+  /* ---------- JUDGING TABLE ---------- */
+  .judge-table{ width:100%; border-collapse:collapse; max-width:640px; }
+  .judge-table td{ padding:14px 0; border-bottom:1px solid var(--border); }
+  .judge-table td:first-child{ color:var(--text); }
+  .judge-table td:last-child{ text-align:right; font-family:'JetBrains Mono'; color:var(--copper-bright); font-weight:700; width:80px; }
+
+  /* ---------- REGISTRATION ---------- */
+  .reg-wrap{ display:grid; grid-template-columns:1fr 1.3fr; gap:56px; align-items:start; }
+  .reg-count{ font-family:'JetBrains Mono'; font-size:0.86rem; color:var(--text-muted); margin-bottom:6px; }
+  .reg-count strong{ color:var(--signal-on); }
+  .form-panel{ background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:32px; }
+  .form-row{ margin-bottom:18px; }
+  .form-row label{ display:block; font-size:0.82rem; color:var(--text-muted); margin-bottom:6px; }
+  .form-row input, .form-row select{
+    width:100%; background:var(--panel-2); border:1px solid var(--border); color:var(--text);
+    padding:11px 12px; border-radius:var(--radius); font-family:'Inter'; font-size:0.92rem;
+  }
+  .form-row input:focus, .form-row select:focus{ border-color:var(--copper); }
+  .form-grid2{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .member-block{ border:1px dashed var(--border); border-radius:4px; padding:16px; margin-bottom:16px; }
+  .member-block .mb-title{ font-family:'JetBrains Mono'; font-size:0.76rem; color:var(--copper); margin-bottom:12px; }
+  .form-note{ font-size:0.78rem; color:var(--text-muted); margin-top:10px; }
+  .submit-btn{
+    width:100%; background:var(--copper); color:#161006; padding:14px; border:none; border-radius:var(--radius);
+    font-weight:600; font-size:0.95rem; cursor:pointer; font-family:inherit; margin-top:6px;
+  }
+  .submit-btn:hover{ background:var(--copper-bright); }
+  .submit-btn:disabled{ opacity:0.5; cursor:not-allowed; }
+  .err{ color:var(--danger); font-size:0.8rem; margin-top:8px; display:none; }
+
+  .success-panel{ display:none; text-align:center; padding:40px 20px; }
+  .success-panel .led{ margin:0 auto 20px; width:44px; height:44px; }
+  .success-panel h3{ font-size:1.4rem; margin-bottom:10px; }
+  .team-code{
+    display:inline-block; margin-top:16px; padding:12px 20px; background:var(--panel-2);
+    border:1px solid var(--copper); border-radius:var(--radius); font-family:'JetBrains Mono';
+    font-size:1.1rem; color:var(--copper-bright); letter-spacing:0.05em;
+  }
+
+  /* ---------- FOOTER ---------- */
+  footer{ padding:40px 0; border-top:1px solid var(--border); }
+  .foot-grid{ display:flex; justify-content:space-between; flex-wrap:wrap; gap:20px; font-size:0.85rem; color:var(--text-muted); }
+  .foot-grid strong{ color:var(--text); }
+
+  @media (max-width: 860px){
+    .hero-grid{ grid-template-columns:1fr; }
+    .hero h1{ font-size:2.3rem; }
+    .rounds-track{ grid-template-columns:1fr; gap:32px; }
+    .rounds-track::before{ display:none; }
+    .reg-wrap{ grid-template-columns:1fr; }
+    .navlinks{ display:none; }
+    .form-grid2{ grid-template-columns:1fr; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{ transition:none !important; scroll-behavior:auto !important; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <div class="brand"><span class="brand-dot"></span>Truth or Gate</div>
+    <div class="navlinks">
+      <a href="#rounds">Rounds</a>
+      <a href="#judging">Judging</a>
+      <a href="#register">Register</a>
+      <a href="#rules">Rules</a>
+    </div>
+    <a href="#register" class="nav-cta">Register</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <h1>Flip the inputs.<br>Defend the output.</h1>
+      <p class="lede">A digital circuits event built entirely around truth tables — derive them, build circuits from them, and reverse-engineer them from black-box hardware. Three rounds, ninety minutes, one winning team.</p>
+      <div class="hero-meta">
+        <div><strong>2 members</strong>per team</div>
+        <div><strong>3 rounds</strong>90–120 min</div>
+        <div><strong>Breadboard or sim</strong>your choice</div>
+      </div>
+      <div class="hero-actions">
+        <a href="#register" class="btn-primary">Register your team</a>
+        <a href="#rounds" class="btn-ghost">See the rounds</a>
+      </div>
+    </div>
+
+    <div class="demo">
+      <div class="demo-top">
+        <span class="demo-label">Live gate</span>
+        <select class="gate-select" id="gateSelect">
+          <option value="AND">AND</option>
+          <option value="OR">OR</option>
+          <option value="XOR" selected>XOR</option>
+          <option value="NAND">NAND</option>
+          <option value="NOR">NOR</option>
+          <option value="XNOR">XNOR</option>
+        </select>
+      </div>
+
+      <div class="switches">
+        <div class="switch-unit">
+          <div class="sw-label">A</div>
+          <div class="toggle" id="toggleA" role="switch" aria-checked="false" aria-label="Input A" tabindex="0"><div class="knob"></div></div>
+        </div>
+        <div class="switch-unit">
+          <div class="sw-label">B</div>
+          <div class="toggle" id="toggleB" role="switch" aria-checked="false" aria-label="Input B" tabindex="0"><div class="knob"></div></div>
+        </div>
+      </div>
+
+      <div class="gate-flow">
+        <div class="wire" id="wireA"></div>
+        <div class="gate-box" id="gateBox">XOR</div>
+        <div class="wire" id="wireOut"></div>
+        <div class="led" id="outLed" aria-label="Output"></div>
+      </div>
+
+      <table class="truth" id="truthTable">
+        <thead><tr><th>A</th><th>B</th><th>Y</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</header>
+
+<section id="rounds" class="rounds">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Three rounds, one signal path</h2>
+      <p>Each round removes something you'd normally be given — first the derivation, then the problem statement, then the schematic itself.</p>
+    </div>
+    <div class="rounds-track">
+      <div class="round-node">
+        <div class="node-dot mono">01</div>
+        <span class="round-time">20 min · elimination</span>
+        <h3>Decode the table</h3>
+        <p>Given a 3–4 input truth table, derive the simplified Boolean expression via K-map and name the minimum gates required. Fastest correct answers advance.</p>
+      </div>
+      <div class="round-node">
+        <div class="node-dot mono">02</div>
+        <span class="round-time">40 min · core round</span>
+        <h3>Build the logic</h3>
+        <p>You're handed a real-world scenario, not a table — a staircase switch, a majority-vote sensor, a safety interlock. Build the truth table yourself, then implement it on breadboard or simulator.</p>
+      </div>
+      <div class="round-node">
+        <div class="node-dot mono">03</div>
+        <span class="round-time">20 min · finale</span>
+        <h3>Reverse engineer</h3>
+        <p>A working black-box circuit, inputs and outputs only. Probe it, reconstruct its truth table, and name the function. First correct identification wins the event.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="judging">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>How teams are scored</h2>
+      <p>Minimal circuits score as well as fast ones — this isn't just a speed contest.</p>
+    </div>
+    <table class="judge-table">
+      <tr><td>Correctness of derivation</td><td>30</td></tr>
+      <tr><td>Circuit minimality</td><td>25</td></tr>
+      <tr><td>Working implementation</td><td>25</td></tr>
+      <tr><td>Speed bonus</td><td>10</td></tr>
+      <tr><td>Explanation to judges</td><td>10</td></tr>
+    </table>
+  </div>
+</section>
+
+<section id="register">
+  <div class="wrap reg-wrap">
+    <div>
+      <div class="section-head">
+        <h2>Register your team</h2>
+        <p>Two members per team. Bring your own laptop if you'd rather work in a simulator than on breadboard — both are supported in Round 2.</p>
+      </div>
+      <div class="reg-count" id="regCount">Loading registration count…</div>
+      <p class="form-note">Team details are visible to the event organizers for shortlisting and contact — not published publicly.</p>
+    </div>
+
+    <div class="form-panel">
+      <form id="regForm">
+        <div class="form-row">
+          <label for="teamName">Team name</label>
+          <input type="text" id="teamName" required>
+        </div>
+        <div class="form-grid2">
+          <div class="form-row">
+            <label for="dept">Department</label>
+            <input type="text" id="dept" placeholder="e.g. ICT" required>
+          </div>
+          <div class="form-row">
+            <label for="sem">Semester</label>
+            <input type="text" id="sem" placeholder="e.g. 5" required>
+          </div>
+        </div>
+
+        <div class="member-block">
+          <div class="mb-title">member 1</div>
+          <div class="form-row"><label for="m1name">Name</label><input type="text" id="m1name" required></div>
+          <div class="form-grid2">
+            <div class="form-row"><label for="m1email">Email</label><input type="email" id="m1email" required></div>
+            <div class="form-row"><label for="m1phone">Phone</label><input type="tel" id="m1phone" required></div>
+          </div>
+        </div>
+
+        <div class="member-block">
+          <div class="mb-title">member 2</div>
+          <div class="form-row"><label for="m2name">Name</label><input type="text" id="m2name" required></div>
+          <div class="form-grid2">
+            <div class="form-row"><label for="m2email">Email</label><input type="email" id="m2email" required></div>
+            <div class="form-row"><label for="m2phone">Phone</label><input type="tel" id="m2phone" required></div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label for="format">Round 2 format</label>
+          <select id="format">
+            <option value="breadboard">Breadboard (hardware)</option>
+            <option value="simulator">Simulator (own laptop)</option>
+          </select>
+        </div>
+
+        <button type="submit" class="submit-btn" id="submitBtn">Submit registration</button>
+        <div class="err" id="formErr">Please fill in every field with a valid email and phone number.</div>
+      </form>
+
+      <div class="success-panel" id="successPanel">
+        <div class="led on"></div>
+        <h3>Registration confirmed</h3>
+        <p style="color:var(--text-muted)">Save this code — you'll need it at check-in on event day.</p>
+        <div class="team-code mono" id="teamCode"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="rules">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>What to bring</h2>
+      <p>Standard logic ICs and breadboards are provided per team for Round 2 — bring a laptop only if you're opting for the simulator track. Rounds 1 and 3 need nothing but paper and your team.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-grid">
+    <div><strong>Truth or Gate</strong> — a digital circuits event</div>
+    <div>Questions: reach the event desk or your department coordinator</div>
+  </div>
+</footer>
+
+<script>
+  // ---------- Gate demo ----------
+  const state = { a:false, b:false, gate:'XOR' };
+  const gateFns = {
+    AND: (a,b)=> a&&b,
+    OR: (a,b)=> a||b,
+    XOR: (a,b)=> a!==b,
+    NAND:(a,b)=> !(a&&b),
+    NOR: (a,b)=> !(a||b),
+    XNOR:(a,b)=> a===b,
+  };
+
+  const toggleA = document.getElementById('toggleA');
+  const toggleB = document.getElementById('toggleB');
+  const gateSelect = document.getElementById('gateSelect');
+  const gateBox = document.getElementById('gateBox');
+  const outLed = document.getElementById('outLed');
+  const wireA = document.getElementById('wireA');
+  const wireOut = document.getElementById('wireOut');
+  const truthBody = document.querySelector('#truthTable tbody');
+
+  function setToggle(el, key){
+    el.addEventListener('click', ()=> { state[key] = !state[key]; render(); });
+    el.addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); state[key] = !state[key]; render(); }
+    });
+  }
+  setToggle(toggleA, 'a');
+  setToggle(toggleB, 'b');
+  gateSelect.addEventListener('change', ()=>{ state.gate = gateSelect.value; render(); });
+
+  function render(){
+    toggleA.classList.toggle('on', state.a);
+    toggleA.setAttribute('aria-checked', state.a);
+    toggleB.classList.toggle('on', state.b);
+    toggleB.setAttribute('aria-checked', state.b);
+    gateBox.textContent = state.gate;
+
+    const out = gateFns[state.gate](state.a, state.b);
+    outLed.classList.toggle('on', out);
+    wireA.classList.toggle('live', state.a || state.b);
+    wireOut.classList.toggle('live', out);
+
+    truthBody.innerHTML = '';
+    [[false,false],[false,true],[true,false],[true,true]].forEach(([a,b])=>{
+      const y = gateFns[state.gate](a,b);
+      const tr = document.createElement('tr');
+      if(a===state.a && b===state.b) tr.classList.add('active-row');
+      tr.innerHTML = `<td>${a?1:0}</td><td>${b?1:0}</td><td>${y?1:0}</td>`;
+      truthBody.appendChild(tr);
+    });
+  }
+  render();
+
+  // ---------- Registration + shared storage ----------
+  const STORAGE_KEY = 'truth-or-gate-registrations';
+  const regCountEl = document.getElementById('regCount');
+
+  async function loadCount(){
+    try{
+      const res = await window.storage.get(STORAGE_KEY, true);
+      const list = res ? JSON.parse(res.value) : [];
+      regCountEl.innerHTML = `<strong>${list.length}</strong> team${list.length===1?'':'s'} registered so far`;
+    }catch(e){
+      regCountEl.textContent = 'Be the first team to register.';
+    }
+  }
+  loadCount();
+
+  function genCode(){
+    const hex = () => Math.floor(Math.random()*16).toString(16).toUpperCase();
+    return 'TG-' + Array.from({length:4}, hex).join('');
+  }
+
+  const form = document.getElementById('regForm');
+  const formErr = document.getElementById('formErr');
+  const submitBtn = document.getElementById('submitBtn');
+  const successPanel = document.getElementById('successPanel');
+  const teamCodeEl = document.getElementById('teamCode');
+
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const phoneRe = /^[0-9+\-\s]{7,15}$/;
+
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    formErr.style.display = 'none';
+
+    const entry = {
+      teamName: document.getElementById('teamName').value.trim(),
+      dept: document.getElementById('dept').value.trim(),
+      sem: document.getElementById('sem').value.trim(),
+      format: document.getElementById('format').value,
+      member1: {
+        name: document.getElementById('m1name').value.trim(),
+        email: document.getElementById('m1email').value.trim(),
+        phone: document.getElementById('m1phone').value.trim(),
+      },
+      member2: {
+        name: document.getElementById('m2name').value.trim(),
+        email: document.getElementById('m2email').value.trim(),
+        phone: document.getElementById('m2phone').value.trim(),
+      },
+      submittedAt: new Date().toISOString(),
+    };
+
+    const valid =
+      entry.teamName && entry.dept && entry.sem &&
+      entry.member1.name && emailRe.test(entry.member1.email) && phoneRe.test(entry.member1.phone) &&
+      entry.member2.name && emailRe.test(entry.member2.email) && phoneRe.test(entry.member2.phone);
+
+    if(!valid){
+      formErr.style.display = 'block';
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting…';
+
+    try{
+      let list = [];
+      try{
+        const existing = await window.storage.get(STORAGE_KEY, true);
+        if(existing) list = JSON.parse(existing.value);
+      }catch(err){ /* no existing entries yet */ }
+
+      const code = genCode();
+      entry.code = code;
+      list.push(entry);
+
+      await window.storage.set(STORAGE_KEY, JSON.stringify(list), true);
+
+      form.style.display = 'none';
+      successPanel.style.display = 'block';
+      teamCodeEl.textContent = code;
+      loadCount();
+    }catch(err){
+      formErr.textContent = 'Something went wrong saving your registration. Please try again.';
+      formErr.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit registration';
+    }
+  });
+</script>
+
+</body>
+</html>
