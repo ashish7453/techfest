@@ -2040,6 +2040,7 @@ let state = {
   answered: false,
   perRoundResult: [],
   lobbyPollTimer: null,
+  currentOptionOrder: [],
 };
 
 const el = id => document.getElementById(id);
@@ -2173,14 +2174,22 @@ function startRound(){
   renderCode(c);
   renderProgress();
 
+  // Shuffle the options' display order for this render so the correct
+  // answer doesn't always land in the same position. state.currentOptionOrder
+  // maps each displayed slot back to its original index in c.options, so
+  // submitAnswer can check correctness and show explanations against the
+  // original data without it ever needing to be reordered in place.
+  const optionOrder = shuffleArray(c.options.map((_, i) => i));
+  state.currentOptionOrder = optionOrder;
+
   const optsWrap = el('options');
   optsWrap.innerHTML = "";
   const letters = ['A','B','C','D'];
-  c.options.forEach((optText, idx) => {
+  optionOrder.forEach((originalIdx, displayIdx) => {
     const btn = document.createElement('button');
     btn.className = "opt";
-    btn.innerHTML = `<span class="tag">${letters[idx]}</span><span>${escapeHtml(optText)}</span>`;
-    btn.onclick = () => submitAnswer(idx);
+    btn.innerHTML = `<span class="tag">${letters[displayIdx]}</span><span>${escapeHtml(c.options[originalIdx])}</span>`;
+    btn.onclick = () => submitAnswer(displayIdx);
     optsWrap.appendChild(btn);
   });
 
@@ -2201,24 +2210,27 @@ function tick(){
   }
 }
 
-function submitAnswer(idx){
+function submitAnswer(displayIdx){
   if(state.answered) return;
   state.answered = true;
   clearInterval(state.roundTimer);
 
   const c = CASES[state.round];
+  // The correct answer's position in the shuffled/displayed order for this
+  // render — c.correct is still the original data index, unchanged.
+  const correctDisplayIdx = state.currentOptionOrder.indexOf(c.correct);
   const elapsed = (Date.now() - state.roundStartedAt) / 1000;
   const opts = document.querySelectorAll('.opt');
   opts.forEach((b, i) => {
     b.disabled = true;
-    if(i === c.correct) b.classList.add('correct');
-    else if(i === idx) b.classList.add('wrong');
+    if(i === correctDisplayIdx) b.classList.add('correct');
+    else if(i === displayIdx) b.classList.add('wrong');
   });
 
   const fb = el('feedback');
   fb.classList.add('show');
 
-  if(idx === c.correct){
+  if(displayIdx === correctDisplayIdx){
     let pts = Math.max(20, Math.round(100 - elapsed * 1.5));
     pts = Math.round(pts * DIFFICULTY_MULTIPLIER[c.difficulty] * ROUND_MULTIPLIER[state.currentLevelNumber]);
     if(state.hintUsed) pts = Math.round(pts * 0.6);
@@ -2230,7 +2242,7 @@ function submitAnswer(idx){
   } else {
     state.perRoundResult[state.round] = 'wrong';
     fb.classList.add('wrong');
-    const reason = idx === -1 ? "Time's up." : "Not quite.";
+    const reason = displayIdx === -1 ? "Time's up." : "Not quite.";
     fb.innerHTML = `<b>${reason}</b> ${c.explain}`;
   }
 
