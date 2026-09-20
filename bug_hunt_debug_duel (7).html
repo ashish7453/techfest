@@ -1,0 +1,2269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEGFAULT — The Debugging Duel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0e11;
+    --panel:#12171c;
+    --panel-raised:#161c22;
+    --border:#232b32;
+    --border-soft:#1a2026;
+    --text:#e7e9ea;
+    --muted:#7a8590;
+    --amber:#ffb020;
+    --amber-dim:#8a5f1c;
+    --teal:#3ddc97;
+    --red:#ff5c5c;
+    --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    --sans: 'Space Grotesk', system-ui, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse at top, #131920 0%, var(--bg) 55%);
+    color:var(--text);
+    font-family:var(--sans);
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:28px 16px 60px;
+  }
+  /* subtle scanline texture on the whole page */
+  body::before{
+    content:"";
+    position:fixed; inset:0;
+    background:repeating-linear-gradient(
+      to bottom,
+      rgba(255,255,255,0.012) 0px,
+      rgba(255,255,255,0.012) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    pointer-events:none;
+    z-index:999;
+  }
+
+  .frame{ width:100%; max-width:760px; }
+
+  /* ---------- status bar ---------- */
+  .statusbar{
+    display:flex; align-items:center; justify-content:space-between;
+    border:1px solid var(--border);
+    background:var(--panel);
+    border-radius:6px;
+    padding:10px 16px;
+    margin-bottom:18px;
+    font-family:var(--mono);
+    font-size:13px;
+    color:var(--muted);
+  }
+  .statusbar .dot{
+    width:8px;height:8px;border-radius:50%;
+    background:var(--red);
+    display:inline-block; margin-right:8px;
+    box-shadow:0 0 6px var(--red);
+    animation:blink 1.6s infinite;
+  }
+  @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:.25;} }
+  .statusbar .metric{ color:var(--text); font-weight:500; }
+  .statusbar .metric.amber{ color:var(--amber); }
+  .statusbar .metric.teal{ color:var(--teal); }
+
+  /* ---------- hero / start screen ---------- */
+  .hero{
+    border:1px solid var(--border);
+    background:var(--panel);
+    border-radius:8px;
+    padding:40px 34px;
+    text-align:left;
+  }
+  .hero h1{
+    font-size:clamp(28px,5vw,42px);
+    line-height:1.05;
+    margin:0 0 6px;
+    letter-spacing:-0.01em;
+    font-weight:700;
+  }
+  .hero h1 .glyph{ color:var(--amber); }
+  .hero .cursor{
+    display:inline-block; width:0.5em; height:0.9em;
+    background:var(--amber); margin-left:4px;
+    animation:blink 1s steps(1) infinite;
+    transform:translateY(2px);
+  }
+  .hero p.tag{
+    font-family:var(--mono);
+    color:var(--muted);
+    font-size:14.5px;
+    margin:14px 0 28px;
+    line-height:1.6;
+  }
+  .rules{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px 22px;
+    margin-bottom:28px;
+    font-family:var(--mono);
+    font-size:13px;
+    color:var(--text);
+  }
+  .rules div{ display:flex; gap:10px; align-items:flex-start; }
+  .rules span.num{ color:var(--amber); }
+
+  input[type=text]{
+    width:100%;
+    background:var(--bg);
+    border:1px solid var(--border);
+    color:var(--text);
+    font-family:var(--mono);
+    font-size:14px;
+    padding:12px 14px;
+    border-radius:5px;
+    margin-bottom:16px;
+    outline:none;
+  }
+  input[type=text]:focus{ border-color:var(--amber); }
+
+  button{
+    font-family:var(--sans);
+    font-weight:600;
+    font-size:15px;
+    border-radius:5px;
+    border:1px solid transparent;
+    padding:13px 22px;
+    cursor:pointer;
+    transition:transform .08s ease, background .15s ease, border-color .15s ease;
+  }
+  button:active{ transform:scale(0.98); }
+  .btn-primary{
+    background:var(--amber);
+    color:#181206;
+  }
+  .btn-primary:hover{ background:#ffc250; }
+  .btn-primary:disabled{ background:var(--amber-dim); color:#3a2c10; cursor:not-allowed; }
+  .btn-ghost{
+    background:transparent;
+    color:var(--text);
+    border-color:var(--border);
+  }
+  .btn-ghost:hover{ border-color:var(--muted); }
+
+  /* ---------- case card ---------- */
+  .case{
+    border:1px solid var(--border);
+    background:var(--panel);
+    border-radius:8px;
+    overflow:hidden;
+  }
+  .case-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 18px;
+    border-bottom:1px solid var(--border);
+    background:var(--panel-raised);
+  }
+  .case-head .id{ font-family:var(--mono); color:var(--muted); font-size:12.5px; }
+  .case-head .title{ font-weight:600; font-size:15px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .diff-badge{
+    font-family:var(--mono);
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:0.04em;
+    padding:2px 7px;
+    border-radius:3px;
+    border:1px solid;
+  }
+  .diff-badge.easy{ color:var(--teal); border-color:var(--teal); background:rgba(61,220,151,0.08); }
+  .diff-badge.medium{ color:var(--amber); border-color:var(--amber); background:rgba(255,176,32,0.08); }
+  .diff-badge.hard{ color:var(--red); border-color:var(--red); background:rgba(255,92,92,0.08); }
+  .timer-ring{
+    font-family:var(--mono);
+    font-size:13px;
+    padding:5px 10px;
+    border:1px solid var(--border);
+    border-radius:4px;
+    color:var(--amber);
+    min-width:52px;
+    text-align:center;
+  }
+  .timer-ring.low{ color:var(--red); border-color:var(--red); }
+
+  .code-window{
+    margin:18px;
+    border:1px solid var(--border-soft);
+    border-radius:6px;
+    overflow:hidden;
+    background:#0d1216;
+  }
+  .code-titlebar{
+    display:flex; align-items:center; gap:6px;
+    padding:8px 12px;
+    background:#0f1418;
+    border-bottom:1px solid var(--border-soft);
+  }
+  .code-titlebar .cdot{ width:9px;height:9px;border-radius:50%; }
+  .code-titlebar .cdot:nth-child(1){ background:#ff5f57; }
+  .code-titlebar .cdot:nth-child(2){ background:#febc2e; }
+  .code-titlebar .cdot:nth-child(3){ background:#28c840; }
+  .code-titlebar .fname{
+    font-family:var(--mono); font-size:11.5px; color:var(--muted); margin-left:8px;
+  }
+  pre.code{
+    margin:0; padding:16px 18px;
+    font-family:var(--mono); font-size:13.5px; line-height:1.65;
+    overflow-x:auto;
+    color:#d3d7db;
+  }
+  pre.code .ln{ color:#43505a; display:inline-block; width:22px; user-select:none; }
+  pre.code .bugline{ background:rgba(255,92,92,0.10); display:inline-block; width:100%; }
+  .kw{ color:#c586c0; } .fn{ color:#63b9e0; } .str{ color:#ce9178; } .num{ color:#b5cea8; } .cm{ color:#5c6b74; font-style:italic;}
+
+  .options{
+    display:flex; flex-direction:column; gap:9px;
+    padding:0 18px 18px;
+  }
+  .opt{
+    text-align:left;
+    background:var(--bg);
+    border:1px solid var(--border);
+    color:var(--text);
+    font-family:var(--mono);
+    font-size:13.5px;
+    padding:12px 14px;
+    border-radius:5px;
+    width:100%;
+    display:flex; gap:12px; align-items:flex-start;
+  }
+  .opt .tag{ color:var(--muted); flex-shrink:0; }
+  .opt:hover:not(:disabled){ border-color:var(--amber-dim); }
+  .opt.correct{ border-color:var(--teal); background:rgba(61,220,151,0.08); }
+  .opt.wrong{ border-color:var(--red); background:rgba(255,92,92,0.08); }
+  .opt:disabled{ cursor:default; }
+
+  .feedback{
+    margin:0 18px 18px;
+    padding:14px 16px;
+    border-radius:6px;
+    border:1px solid var(--border);
+    font-size:13.5px;
+    line-height:1.6;
+    display:none;
+  }
+  .feedback.show{ display:block; }
+  .feedback.correct{ border-color:var(--teal); color:#c9f5e2; background:rgba(61,220,151,0.06); }
+  .feedback.wrong{ border-color:var(--red); color:#ffd9d9; background:rgba(255,92,92,0.06); }
+  .feedback b{ font-family:var(--mono); }
+
+  .case-foot{
+    display:flex; flex-direction:column; gap:10px;
+    padding:14px 18px;
+    border-top:1px solid var(--border);
+    background:var(--panel-raised);
+  }
+  .case-foot-actions{ display:flex; gap:10px; align-items:center; justify-content:space-between; }
+  .progress-track{ display:flex; flex-wrap:wrap; gap:5px; }
+  .bug-dot{
+    width:8px;height:8px; border-radius:2px;
+    background:var(--border);
+  }
+  .bug-dot.done-correct{ background:var(--teal); }
+  .bug-dot.done-wrong{ background:var(--red); }
+  .bug-dot.current{ background:var(--amber); }
+
+  /* ---------- results ---------- */
+  .results h2{ font-size:26px; margin:0 0 4px; }
+  .results .sub{ color:var(--muted); font-family:var(--mono); font-size:13px; margin-bottom:24px; }
+  .score-grid{
+    display:grid; grid-template-columns:repeat(3,1fr); gap:10px;
+    margin-bottom:26px;
+  }
+  .score-box{
+    border:1px solid var(--border); border-radius:6px; padding:16px;
+    background:var(--panel-raised);
+  }
+  .score-box .num{ font-family:var(--mono); font-size:26px; color:var(--amber); font-weight:700; }
+  .score-box .lbl{ font-size:12px; color:var(--muted); margin-top:4px; }
+
+  .leaderboard{ margin-top:10px; }
+  .leaderboard h3{ font-size:14px; text-transform:none; color:var(--muted); font-weight:500; margin-bottom:10px; font-family:var(--mono); }
+  table{ width:100%; border-collapse:collapse; font-family:var(--mono); font-size:13.5px; }
+  th{ text-align:left; color:var(--muted); font-weight:500; padding:8px 10px; border-bottom:1px solid var(--border); font-size:12px; }
+  td{ padding:9px 10px; border-bottom:1px solid var(--border-soft); }
+  tr.me td{ color:var(--amber); }
+
+  .row{ display:flex; gap:12px; margin-top:22px; flex-wrap:wrap; }
+  .hint-btn{
+    background:transparent; border:1px dashed var(--border);
+    color:var(--muted); font-family:var(--mono); font-size:12.5px;
+    padding:8px 12px;
+  }
+  .hint-btn:hover{ border-color:var(--amber-dim); color:var(--amber); }
+  .hint-text{
+    font-family:var(--mono); font-size:12.5px; color:var(--amber);
+    padding:0 18px 12px; margin-top:-6px;
+  }
+
+  .hidden{ display:none !important; }
+  @media (max-width:520px){
+    .rules{ grid-template-columns:1fr; }
+    .score-grid{ grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="frame">
+
+  <div class="statusbar">
+    <div><span class="dot"></span>LIVE — TECH FEST DEBUG ARENA</div>
+    <div>
+      <span class="metric amber" id="sb-score">0</span> pts &nbsp;·&nbsp;
+      <span class="metric teal" id="sb-level">RND –/3</span> &nbsp;·&nbsp;
+      <span class="metric" id="sb-round">0/–</span> cases
+    </div>
+  </div>
+
+  <!-- START SCREEN -->
+  <div class="hero" id="screen-start">
+    <h1><span class="glyph">SEGFAULT</span><span class="cursor"></span></h1>
+    <h1 style="font-size:18px; font-weight:500; color:var(--muted); margin-top:2px;">the debugging duel</h1>
+    <p class="tag">// A 3-round elimination tournament. Each round is scored, ranked, and only the top scorers advance to the next round.</p>
+
+    <div class="rules">
+      <div><span class="num">01</span> Round 1: 15 easy cases. Round 2: 8 easy + 2 medium. Round 3: 4 easy + 2 medium + 2 hard.</div>
+      <div><span class="num">02</span> Rounds open and close on the organizer's schedule — you'll wait between rounds.</div>
+      <div><span class="num">03</span> Only the top scorers after each round advance to the next — miss the cutoff and you're out.</div>
+      <div><span class="num">04</span> 45 seconds and one submission per case. A hint is available — it costs you points.</div>
+    </div>
+
+    <input type="text" id="player-name" placeholder="Enter your name / team tag" maxlength="24">
+    <button class="btn-primary" id="btn-start" style="width:100%;">Check tournament status</button>
+  </div>
+
+  <!-- LOBBY SCREEN -->
+  <div class="hero hidden" id="screen-lobby">
+    <h2 id="lobby-heading">Checking status…</h2>
+    <div class="sub" id="lobby-sub">// hang tight</div>
+
+    <div id="lobby-body" style="margin-bottom:18px;"></div>
+
+    <button class="btn-primary hidden" id="btn-play-level" style="width:100%; margin-bottom:10px;">Play</button>
+    <button class="btn-ghost" id="btn-refresh-lobby" style="width:100%;">Refresh status</button>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div class="case hidden" id="screen-game">
+    <div class="case-head">
+      <div>
+        <div class="id" id="case-id">CASE 01 / 08</div>
+        <div class="title">
+          <span id="case-title">Off-by-one</span>
+          <span class="diff-badge" id="case-difficulty">EASY</span>
+        </div>
+      </div>
+      <div class="timer-ring" id="timer-ring">45s</div>
+    </div>
+
+    <div class="code-window">
+      <div class="code-titlebar">
+        <div class="cdot"></div><div class="cdot"></div><div class="cdot"></div>
+        <span class="fname" id="code-fname">bug_01.py</span>
+      </div>
+      <pre class="code" id="code-block"></pre>
+    </div>
+
+    <div class="options" id="options"></div>
+    <div class="feedback" id="feedback"></div>
+
+    <div class="case-foot">
+      <div class="progress-track" id="progress-track"></div>
+      <div class="case-foot-actions">
+        <button class="hint-btn" id="btn-hint">reveal hint (−20 pts)</button>
+        <button class="btn-primary hidden" id="btn-next">Next case</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LEVEL SUBMITTED SCREEN -->
+  <div class="hero results hidden" id="screen-level-complete">
+    <h2 id="lc-heading">Round 1 submitted.</h2>
+    <div class="sub" id="lc-sub">// your score has been logged — waiting on the organizer for the next round</div>
+
+    <div class="score-grid">
+      <div class="score-box"><div class="num" id="lc-correct">0/15</div><div class="lbl">correct this round</div></div>
+      <div class="score-box"><div class="num" id="lc-points">0</div><div class="lbl">points this round</div></div>
+      <div class="score-box"><div class="num" id="lc-total">0</div><div class="lbl">cumulative score</div></div>
+    </div>
+
+    <button class="btn-primary" id="btn-continue-level" style="width:100%;">Back to lobby</button>
+  </div>
+
+  <!-- FINAL / ELIMINATED SCREEN -->
+  <div class="hero results hidden" id="screen-results">
+    <h2 id="final-heading">Tournament complete.</h2>
+    <div class="sub" id="final-sub">// results logged to the arena board</div>
+
+    <div class="score-grid">
+      <div class="score-box"><div class="num" id="res-score">0</div><div class="lbl">cumulative score</div></div>
+      <div class="score-box"><div class="num" id="res-rank">—</div><div class="lbl">your rank</div></div>
+      <div class="score-box"><div class="num" id="res-levels">0/3</div><div class="lbl">rounds reached</div></div>
+    </div>
+
+    <div class="leaderboard">
+      <h3 id="final-board-heading">// standings — top 10</h3>
+      <table>
+        <thead><tr><th>#</th><th>name</th><th>score</th><th>rounds</th></tr></thead>
+        <tbody id="leaderboard-body"></tbody>
+      </table>
+    </div>
+
+    <div class="row">
+      <button class="btn-ghost" id="btn-refresh-board">Refresh standings</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ---------------------------------------------------------------
+// BUG DATA — each case: buggy code (with a highlighted bug line),
+// four candidate fixes, correct index, explanation, hint.
+// ---------------------------------------------------------------
+const ALL_CASES = [
+  {
+    file: "avg_grade.py",
+    title: "The vanishing average",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def average(scores):'},
+      {n:2, t:'    total = 0', bug:false},
+      {n:3, t:'    for s in scores:', bug:false},
+      {n:4, t:'        total = s', bug:true},
+      {n:5, t:'    return total / len(scores)'},
+    ],
+    hint: "Look at line 4 — is anything actually being accumulated?",
+    options: [
+      "Change `total = s` to `total += s`",
+      "Change `return total / len(scores)` to `return total // len(scores)`",
+      "Change `total = 0` to `total = []`",
+      "Change `for s in scores:` to `for s in range(scores):`",
+    ],
+    correct: 0,
+    explain: "`total = s` overwrites the running total every loop instead of adding to it. It needs `total += s` to actually accumulate the sum before dividing."
+  },
+  {
+    file: "shopping_cart.py",
+    title: "The shared basket",
+    difficulty: "medium",
+    code: [
+      {n:1, t:'def add_item(item, cart=[]):'},
+      {n:2, t:'    cart.append(item)'},
+      {n:3, t:'    return cart'},
+      {n:4, t:''},
+      {n:5, t:'cart_a = add_item("apple")'},
+      {n:6, t:'cart_b = add_item("bread")', bug:true},
+    ],
+    hint: "Mutable default arguments in Python are created once, not per call.",
+    options: [
+      "Add `cart.clear()` before appending",
+      "Change the default to `cart=None` and create a new list inside the function if it's None",
+      "Change `cart.append(item)` to `cart = [item]`",
+      "Call the function with `add_item(item, cart=[])` explicitly every time",
+    ],
+    correct: 1,
+    explain: "Default argument values are evaluated once when the function is defined. `cart=[]` is the same list shared across every call, so `cart_b` ends up containing `apple` too. Using `cart=None` and creating a fresh list inside the function avoids the shared state."
+  },
+  {
+    file: "guest_list.py",
+    title: "The off-by-one gate",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'names = ["Ana", "Ravi", "Zoe", "Ken"]'},
+      {n:2, t:'for i in range(1, len(names)):', bug:true},
+      {n:3, t:'    print(f"{i}. {names[i]}")'},
+    ],
+    hint: "Whose name never gets printed?",
+    options: [
+      "Change `range(1, len(names))` to `range(0, len(names))`",
+      "Change `names[i]` to `names[i-1]`",
+      "Change `len(names)` to `len(names) - 1`",
+      "Change the loop to `for i in range(len(names) + 1):`",
+    ],
+    correct: 0,
+    explain: "Starting the range at 1 skips index 0, so \"Ana\" is never printed. Ranges should start at 0 to cover every index in the list."
+  },
+  {
+    file: "temp_convert.py",
+    title: "The frozen conversion",
+    difficulty: "medium",
+    code: [
+      {n:1, t:'def to_fahrenheit(celsius):'},
+      {n:2, t:'    return celsius * 9 / 5 + 32'},
+      {n:3, t:''},
+      {n:4, t:'reading = input("Enter temp in C: ")'},
+      {n:5, t:'print(to_fahrenheit(reading) )', bug:true},
+    ],
+    hint: "What type does `input()` return, and what does the function expect?",
+    options: [
+      "Change `celsius * 9 / 5` to `celsius * 9 // 5`",
+      "Change `print(to_fahrenheit(reading))` to `print(to_fahrenheit(float(reading)))`",
+      "Change `input(...)` to `print(...)`",
+      "Change `return celsius * 9 / 5 + 32` to `return celsius + 9 / 5 * 32`",
+    ],
+    correct: 1,
+    explain: "`input()` always returns a string, but the function does arithmetic on it. Multiplying a string by a number repeats it instead of converting — the input needs `float(reading)` before it's passed in."
+  },
+  {
+    file: "is_even.py",
+    title: "The stubborn checker",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def is_even(n):'},
+      {n:2, t:'    if n % 2 = 0:', bug:true},
+      {n:3, t:'        return True'},
+      {n:4, t:'    return False'},
+    ],
+    hint: "Comparison vs. assignment — which operator actually checks equality?",
+    options: [
+      "Change `n % 2 = 0` to `n % 2 == 0`",
+      "Change `n % 2 = 0` to `n / 2 = 0`",
+      "Change `return True` to `return true`",
+      "Change `if n % 2 = 0:` to `if n % 2 is 0:`",
+    ],
+    correct: 0,
+    explain: "A single `=` is assignment, not comparison, and isn't even valid inside an `if` condition in Python. Equality checks need `==`."
+  },
+  {
+    file: "countdown.py",
+    title: "The loop that never ends",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def countdown(n):'},
+      {n:2, t:'    while n > 0:'},
+      {n:3, t:'        print(n)'},
+      {n:4, t:'        n = n', bug:true},
+      {n:5, t:'    print("Liftoff!")'},
+    ],
+    hint: "For the loop to end, `n` has to actually change each pass.",
+    options: [
+      "Change `n = n` to `n = n - 1`",
+      "Change `while n > 0:` to `while n >= 0:`",
+      "Change `print(n)` to `print(n - 1)`",
+      "Change `def countdown(n):` to `def countdown(n=0):`",
+    ],
+    correct: 0,
+    explain: "`n = n` leaves `n` unchanged forever, so `n > 0` never becomes false — an infinite loop. Decrementing with `n = n - 1` lets the loop actually reach its exit condition."
+  },
+  {
+    file: "word_lengths.py",
+    title: "The index that ran off the page",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'words = ["sun", "moon", "star"]'},
+      {n:2, t:'for i in range(len(words) + 1):', bug:true},
+      {n:3, t:'    print(words[i], len(words[i]))'},
+    ],
+    hint: "Valid indices for a 3-item list run from 0 to... what?",
+    options: [
+      "Change `range(len(words) + 1)` to `range(len(words))`",
+      "Change `words[i]` to `words[i + 1]`",
+      "Change `for i in range(...)` to `for i in words:`",
+      "Change `print(words[i], len(words[i]))` to `print(words[i])`",
+    ],
+    correct: 0,
+    explain: "Adding 1 pushes the loop to index 3 on a 3-item list (valid indices 0–2), causing an IndexError. `range(len(words))` covers exactly the valid indices."
+  },
+  {
+    file: "discount.py",
+    title: "The indentation trap",
+    difficulty: "medium",
+    code: [
+      {n:1, t:'def apply_discount(price, is_member):'},
+      {n:2, t:'    if is_member:'},
+      {n:3, t:'        price = price * 0.9'},
+      {n:4, t:'    return price', bug:true},
+      {n:5, t:'', bug:false},
+    ],
+    hint: "This one actually runs fine... or does it silently do the wrong thing for a specific input? Check what happens when `price` is 0.",
+    options: [
+      "Nothing is wrong — this code is correct as written",
+      "Change `if is_member:` to `if is_member == True:`",
+      "Change `price = price * 0.9` to `price *= 0.9`",
+      "Move `return price` one indentation level in, inside the `if` block",
+    ],
+    correct: 0,
+    explain: "This is a trick case: the code is already correct. `return price` sitting outside the `if` is intentional — it returns the discounted price for members and the original price for everyone else. Moving it inside the `if` would break non-members entirely."
+  },
+  {
+    file: "reverse_string.py",
+    title: "The almost-reversed word",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def reverse(s):'},
+      {n:2, t:'    return s[0:-1]', bug:true},
+    ],
+    hint: "Which slice actually reverses a string versus just trimming its last character?",
+    options: [
+      "Change `s[0:-1]` to `s[::-1]`",
+      "Change `s[0:-1]` to `s[-1:0]`",
+      "Change `s[0:-1]` to `s[1:]`",
+      "Change `def reverse(s):` to `def reverse(s[::-1]):`",
+    ],
+    correct: 0,
+    explain: "`s[0:-1]` returns the string with the last character dropped, not reversed. `s[::-1]` uses a step of -1 to walk the string backward."
+  },
+  {
+    file: "max_finder.py",
+    title: "The negative numbers problem",
+    difficulty: "medium",
+    code: [
+      {n:1, t:'def find_max(numbers):'},
+      {n:2, t:'    max_val = 0', bug:true},
+      {n:3, t:'    for n in numbers:'},
+      {n:4, t:'        if n > max_val:'},
+      {n:5, t:'            max_val = n'},
+      {n:6, t:'    return max_val'},
+    ],
+    hint: "What happens when every number in the list is negative?",
+    options: [
+      "Change `max_val = 0` to `max_val = numbers[0]`",
+      "Change `if n > max_val:` to `if n >= max_val:`",
+      "Change `return max_val` to `return max(max_val, 0)`",
+      "Change `for n in numbers:` to `for n in sorted(numbers):`",
+    ],
+    correct: 0,
+    explain: "Starting max_val at 0 means a list of all-negative numbers never updates it, so the function wrongly returns 0. Seeding max_val with the first element handles negative values correctly."
+  },
+  {
+    file: "dict_get.py",
+    title: "The missing key crash",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def get_price(catalog, item):'},
+      {n:2, t:'    return catalog[item]', bug:true},
+      {n:3, t:''},
+      {n:4, t:'prices = {"pen": 10, "book": 250}'},
+      {n:5, t:'print(get_price(prices, "eraser"))'},
+    ],
+    hint: "What happens when the key genuinely isn't in the dictionary?",
+    options: [
+      'Change `catalog[item]` to `catalog.get(item, "Not found")`',
+      "Change `catalog[item]` to `catalog[item].get()`",
+      "Change `def get_price(catalog, item):` to `def get_price(item, catalog):`",
+      "Change `prices = {...}` to `prices = []`",
+    ],
+    correct: 0,
+    explain: "Direct dictionary indexing raises a KeyError for a missing key. `.get(item, default)` returns a fallback value instead of crashing."
+  },
+  {
+    file: "string_multiply.py",
+    title: "The receipt that won't print",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def make_receipt(item, price):'},
+      {n:2, t:'    return item + ": Rs " + price', bug:true},
+      {n:3, t:''},
+      {n:4, t:'print(make_receipt("Pen", 10))'},
+    ],
+    hint: "What type is `price` here, and what type does string concatenation expect?",
+    options: [
+      'Change `"Rs " + price` to `"Rs " + str(price)`',
+      'Change `item + ": Rs " + price` to `item * ": Rs " * price`',
+      'Change `return item + ": Rs " + price` to `return item, ": Rs ", price`',
+      "Change `def make_receipt(item, price):` to `def make_receipt(item, price=0):`",
+    ],
+    correct: 0,
+    explain: "`price` is an integer, and Python won't concatenate a string with an int using `+`. Wrapping it in `str(price)` converts it first."
+  },
+  {
+    file: "list_remove_while_iterating.py",
+    title: "The skipped negatives",
+    difficulty: "medium",
+    code: [
+      {n:1, t:'def remove_negatives(nums):'},
+      {n:2, t:'    for n in nums:', bug:true},
+      {n:3, t:'        if n < 0:'},
+      {n:4, t:'            nums.remove(n)'},
+      {n:5, t:'    return nums'},
+      {n:6, t:''},
+      {n:7, t:'print(remove_negatives([1, -2, -3, 4]))'},
+    ],
+    hint: "What happens to a list's indices when you remove an item while looping over it?",
+    options: [
+      "Change `for n in nums:` to `for n in nums[:]:` (loop over a copy)",
+      "Change `nums.remove(n)` to `nums.pop(n)`",
+      "Change `if n < 0:` to `if n <= 0:`",
+      "Change `return nums` to `return nums[:]`",
+    ],
+    correct: 0,
+    explain: "Removing items from a list while iterating over it shifts the remaining elements' indices, so the loop silently skips some negatives. Iterating over a copy (`nums[:]`) while modifying the original avoids this."
+  },
+  {
+    file: "recursive_factorial.py",
+    title: "The recursion with no exit",
+    difficulty: "medium",
+    code: [
+      {n:1, t:'def factorial(n):'},
+      {n:2, t:'    return n * factorial(n - 1)', bug:true},
+      {n:3, t:''},
+      {n:4, t:'print(factorial(5))'},
+    ],
+    hint: "What stops the recursive calls from continuing forever?",
+    options: [
+      "Add a base case: `if n == 0: return 1` before the recursive call",
+      "Change `factorial(n - 1)` to `factorial(n + 1)`",
+      "Change `def factorial(n):` to `def factorial(n=1):`",
+      "Change `n * factorial(n - 1)` to `n / factorial(n - 1)`",
+    ],
+    correct: 0,
+    explain: "Without a base case, the recursion never stops and eventually raises a RecursionError. Adding `if n == 0: return 1` gives it somewhere to stop."
+  },
+  {
+    file: "inventory_class.py",
+    title: "The shared cart",
+    difficulty: "medium",
+    code: [
+      {n:1, t:'class Cart:'},
+      {n:2, t:'    items = []', bug:true},
+      {n:3, t:'    def add(self, item):'},
+      {n:4, t:'        self.items.append(item)'},
+      {n:5, t:''},
+      {n:6, t:'cart_a = Cart(); cart_a.add("Pen")'},
+      {n:7, t:'cart_b = Cart(); cart_b.add("Book")'},
+    ],
+    hint: "Is `items` defined per object, or shared by the whole class?",
+    options: [
+      "Move `items = []` into `__init__` as `self.items = []`",
+      "Change `self.items.append(item)` to `Cart.items.append(item)`",
+      "Change `items = []` to `items = ()`",
+      "Change `cart_b = Cart()` to `cart_b = Cart(items=[])`",
+    ],
+    correct: 0,
+    explain: "`items = []` defined at class level is a single list shared by every instance. Defining it inside `__init__` as `self.items = []` gives each Cart its own list."
+  },
+  {
+    file: "divide_safely.py",
+    title: "The empty-list average",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def average(total, count):'},
+      {n:2, t:'    return total / count', bug:true},
+      {n:3, t:''},
+      {n:4, t:'scores = []'},
+      {n:5, t:'print(average(sum(scores), len(scores)))'},
+    ],
+    hint: "What happens when `scores` is empty?",
+    options: [
+      "Check `if count == 0: return 0` before dividing",
+      "Change `total / count` to `total // count`",
+      "Change `sum(scores)` to `sum(scores) + 1`",
+      "Change `len(scores)` to `len(scores) + 1`",
+    ],
+    correct: 0,
+    explain: "Dividing by `count` when the list is empty raises a ZeroDivisionError. Guarding for `count == 0` avoids the crash."
+  },
+  {
+    file: "sort_students.py",
+    title: "The leaderboard in the wrong order",
+    difficulty: "medium",
+    code: [
+      {n:1, t:'students = [("Ravi", 82), ("Zoe", 91), ("Ken", 76)]'},
+      {n:2, t:'students.sort()', bug:true},
+      {n:3, t:'print(students)'},
+    ],
+    hint: "What does `.sort()` compare when the items are tuples, and is that the order the code actually wants?",
+    options: [
+      "Change `students.sort()` to `students.sort(key=lambda s: s[1], reverse=True)`",
+      "Change `students.sort()` to `students.sort(reverse=True)`",
+      "Change `students = [...]` to `students = sorted(students)`",
+      "Change `print(students)` to `print(sorted(students))`",
+    ],
+    correct: 0,
+    explain: "Without a key, tuples sort by their first element (name) alphabetically. Sorting by score requires `key=lambda s: s[1]`, and `reverse=True` puts the highest scorer first."
+  },
+  {
+    file: "case_convert.py",
+    title: "The shout that stayed quiet",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def shout(text):'},
+      {n:2, t:'    text.upper()', bug:true},
+      {n:3, t:'    return text'},
+      {n:4, t:''},
+      {n:5, t:'print(shout("hello"))'},
+    ],
+    hint: "Strings are immutable in Python — does `.upper()` change `text` in place, or return something new?",
+    options: [
+      "Change `text.upper()` to `text = text.upper()`",
+      "Change `return text` to `return text.upper`",
+      "Change `def shout(text):` to `def shout(text.upper()):`",
+      "Change `text.upper()` to `text.upper(text)`",
+    ],
+    correct: 0,
+    explain: "`.upper()` returns a new uppercase string; it doesn't modify `text` in place because strings are immutable. The result needs to be reassigned: `text = text.upper()`."
+  },
+  {
+    file: "list_comprehension_bug.py",
+    title: "The backwards filter",
+    difficulty: "medium",
+    code: [
+      {n:1, t:'nums = [1, 2, 3, 4, 5, 6]'},
+      {n:2, t:'result = [n * n for n in nums if n % 2]', bug:true},
+      {n:3, t:'print("Even squares:", result)'},
+    ],
+    hint: "For which numbers is `n % 2` truthy — the evens or the odds?",
+    options: [
+      "Change `if n % 2` to `if n % 2 == 0`",
+      "Change `n * n` to `n + n`",
+      "Change `if n % 2` to `if not n`",
+      "Change `for n in nums` to `for n in range(nums)`",
+    ],
+    correct: 0,
+    explain: "`n % 2` is 1 (truthy) for odd numbers and 0 (falsy) for even numbers, so this comprehension keeps odds — the opposite of what's wanted. `n % 2 == 0` correctly filters for even numbers."
+  },
+  {
+    file: "find_pairs.py",
+    title: "The pair search that quits early",
+    difficulty: "medium",
+    code: [
+      {n:1, t:'def find_pairs(nums, target):'},
+      {n:2, t:'    pairs = []'},
+      {n:3, t:'    for i in range(len(nums)):'},
+      {n:4, t:'        for j in range(len(nums)):'},
+      {n:5, t:'            if i == j:'},
+      {n:6, t:'                break', bug:true},
+      {n:7, t:'            if nums[i] + nums[j] == target:'},
+      {n:8, t:'                pairs.append((nums[i], nums[j]))'},
+      {n:9, t:'    return pairs'},
+    ],
+    hint: "When `i` equals `j`, do you want to skip just that one pairing, or stop the whole inner loop?",
+    options: [
+      "Change `break` to `continue`",
+      "Change `if i == j:` to `if i != j:`",
+      "Change `break` to `pass`",
+      "Change `for j in range(len(nums)):` to `for j in range(i, len(nums)):`",
+    ],
+    correct: 0,
+    explain: "`break` exits the inner loop completely the moment `i` equals `j`, so many valid pairs after that point never get checked. `continue` skips just that one iteration and lets the loop carry on."
+  },
+  {
+    file: "string_format_bug.py",
+    title: "The template that never filled in",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'name = "Maya"'},
+      {n:2, t:'score = 95'},
+      {n:3, t:'message = "{name} scored {score} points"', bug:true},
+      {n:4, t:'print(message)'},
+    ],
+    hint: "Curly braces alone don't interpolate variables — what keyword makes a string an f-string?",
+    options: [
+      'Change `"{name} scored {score} points"` to `f"{name} scored {score} points"`',
+      "Change `print(message)` to `print(message.format())`",
+      "Change `name = \"Maya\"` to `name = {Maya}`",
+      'Change `message = "..."` to `message = "..." % (name, score)`',
+    ],
+    correct: 0,
+    explain: "Without the `f` prefix, `{name}` and `{score}` are just literal text, not placeholders. Adding `f` before the quotes makes Python substitute the variable values."
+  },
+  {
+    file: "boolean_logic.py",
+    title: "The check that's always true",
+    difficulty: "medium",
+    code: [
+      {n:1, t:'def is_valid_age(age):'},
+      {n:2, t:'    if age != 0 or age != 150:', bug:true},
+      {n:3, t:'        return True'},
+      {n:4, t:'    return False'},
+      {n:5, t:''},
+      {n:6, t:'print(is_valid_age(200))'},
+    ],
+    hint: "Can a single number ever fail both `age != 0` and `age != 150` at the same time?",
+    options: [
+      "Change `or` to `and`",
+      "Change both `!=` to `==`",
+      "Swap the order of `return True` and `return False`",
+      "Change `if age != 0 or age != 150:` to `if age > 0 or age < 150:`",
+    ],
+    correct: 0,
+    explain: "With `or`, the condition is true unless age is somehow both 0 and 150 at once — impossible — so it's always True. `and` correctly requires both checks to hold before returning True."
+  },
+  {
+    file: "count_vowels.py",
+    title: "The vowel count that came back zero",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def count_vowels(word):'},
+      {n:2, t:'    count = 0'},
+      {n:3, t:'    for ch in word:'},
+      {n:4, t:'        if ch in "aeiou":', bug:true},
+      {n:5, t:'            count += 1'},
+      {n:6, t:'    return count'},
+      {n:7, t:''},
+      {n:8, t:'print(count_vowels("EDUCATION"))'},
+    ],
+    hint: "The sample input is in ALL CAPS — does the vowel check account for that?",
+    options: [
+      'Change `if ch in "aeiou":` to `if ch.lower() in "aeiou":`',
+      "Change `for ch in word:` to `for ch in word.split():`",
+      "Change `count += 1` to `count = 1`",
+      'Change `if ch in "aeiou":` to `if ch is "aeiou":`',
+    ],
+    correct: 0,
+    explain: 'The check only matches lowercase vowels, so an all-uppercase word like "EDUCATION" counts zero vowels. Lowercasing each character first (`ch.lower()`) makes the check case-insensitive.'
+  },
+  {
+    file: "negative_index.py",
+    title: "The last score that wasn't last",
+    difficulty: "medium",
+    code: [
+      {n:1, t:'scores = [70, 85, 90, 60]'},
+      {n:2, t:'last_index = -0', bug:true},
+      {n:3, t:'print("Last score:", scores[last_index])'},
+    ],
+    hint: "Does `-0` behave differently from `0` for integers in Python?",
+    options: [
+      "Change `last_index = -0` to `last_index = -1`",
+      "Change `scores[last_index]` to `scores[len(scores)]`",
+      "Change `last_index = -0` to `last_index = len(scores)`",
+      'Change `print(...)` to `print("Last score:", scores[0])`',
+    ],
+    correct: 0,
+    explain: "In Python, `-0` is just `0` — there's no negative zero for integers — so `scores[-0]` fetches the first element, not the last. `-1` is the correct index for the last item."
+  },
+  {
+    file: "concat_lists.py",
+    title: "The nested merge",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def combine(list_a, list_b):'},
+      {n:2, t:'    list_a.append(list_b)', bug:true},
+      {n:3, t:'    return list_a'},
+      {n:4, t:''},
+      {n:5, t:'print(combine([1, 2], [3, 4]))'},
+    ],
+    hint: "Does `.append()` merge two lists together, or add one as a single item inside the other?",
+    options: [
+      "Change `list_a.append(list_b)` to `list_a.extend(list_b)`",
+      "Change `list_a.append(list_b)` to `list_a.append(*list_b)`",
+      "Change `return list_a` to `return list_a[0]`",
+      "Change `def combine(list_a, list_b):` to `def combine(list_a, *list_b):`",
+    ],
+    correct: 0,
+    explain: "`.append()` adds its argument as a single element, producing a nested list `[1, 2, [3, 4]]`. `.extend()` adds each element of `list_b` individually, flattening the two lists together."
+  },
+  {
+    file: "swap_variables.py",
+    title: "The swap that lost a value",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'a = 5'},
+      {n:2, t:'b = 10'},
+      {n:3, t:'a = b', bug:true},
+      {n:4, t:'b = a'},
+      {n:5, t:'print(a, b)'},
+    ],
+    hint: "By the time `b = a` runs on line 4, does `a` still hold its original value?",
+    options: [
+      "Change lines 3–4 to a single line: `a, b = b, a`",
+      "Change `b = a` to `b = 10`",
+      "Swap the order: run `b = a` before `a = b`",
+      "Change `a = b` to `a += b`",
+    ],
+    correct: 0,
+    explain: "`a = b` overwrites `a`'s original value before `b = a` runs, so `b` ends up equal to the new `a`, not a true swap. Python's tuple assignment `a, b = b, a` evaluates both sides before reassigning, swapping them correctly in one step."
+  },
+  {
+    file: "dictionary_iteration.py",
+    title: "The grouping that crashed",
+    difficulty: "medium",
+    code: [
+      {n:1, t:'def group_by_length(words):'},
+      {n:2, t:'    groups = {}'},
+      {n:3, t:'    for word in words:'},
+      {n:4, t:'        key = len(word)'},
+      {n:5, t:'        groups[key].append(word)', bug:true},
+      {n:6, t:'    return groups'},
+      {n:7, t:''},
+      {n:8, t:'print(group_by_length(["cat", "dog", "lion", "ox"]))'},
+    ],
+    hint: "What happens the first time a particular word-length key hasn't been seen yet?",
+    options: [
+      "Change `groups[key].append(word)` to `groups.setdefault(key, []).append(word)`",
+      "Change `groups = {}` to `groups = []`",
+      "Change `groups[key].append(word)` to `groups[key] = word`",
+      "Change `key = len(word)` to `key = str(len(word))`",
+    ],
+    correct: 0,
+    explain: "`groups[key]` raises a KeyError the first time that length hasn't been added to the dictionary yet. `groups.setdefault(key, [])` creates an empty list for new keys automatically before appending."
+  },
+  {
+    file: "exception_handling.py",
+    title: "The error that hid another error",
+    difficulty: "medium",
+    code: [
+      {n:1, t:'def safe_divide(a, b):'},
+      {n:2, t:'    try:'},
+      {n:3, t:'        return a / b'},
+      {n:4, t:'    except:', bug:true},
+      {n:5, t:'        return None'},
+      {n:6, t:''},
+      {n:7, t:'print(safe_divide(10, "2"))'},
+    ],
+    hint: "A bare `except:` catches every possible error, including ones you didn't expect — is that hiding a real problem here?",
+    options: [
+      "Change `except:` to `except ZeroDivisionError:` so only the expected error is caught",
+      "Change `except:` to `except: pass`",
+      "Remove the `try`/`except` entirely",
+      "Change `return a / b` to `return a // b`",
+    ],
+    correct: 0,
+    explain: 'The bare `except:` swallows every error, including the TypeError from dividing by the string "2" — silently returning None instead of revealing the real bug. Catching the specific expected exception lets unexpected errors surface.'
+  },
+  {
+    file: "running_total.py",
+    title: "The receipt printed once",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def print_receipt(items):'},
+      {n:2, t:'    total = 0'},
+      {n:3, t:'    for name, price in items:'},
+      {n:4, t:'        total += price'},
+      {n:5, t:'    print(name, price)', bug:true},
+      {n:6, t:'    return total'},
+      {n:7, t:''},
+      {n:8, t:'print_receipt([("Pen", 10), ("Book", 250)])'},
+    ],
+    hint: "Should each item be printed once per loop, or just once at the very end?",
+    options: [
+      "Indent `print(name, price)` one level to place it inside the for loop",
+      "Change `total += price` to `total = price`",
+      "Move `return total` above `print(name, price)`",
+      "Change `for name, price in items:` to `for name, price in items[:-1]:`",
+    ],
+    correct: 0,
+    explain: "`print(name, price)` sits outside the loop, so it only runs once, after the loop ends, using whatever `name` and `price` were left over from the last item. Indenting it into the loop body prints every item."
+  },
+  {
+    file: "api_response_check.py",
+    title: "The empty list crash",
+    difficulty: "medium",
+    code: [
+      {n:1, t:'def get_first_error(errors):'},
+      {n:2, t:'    if errors[0]:', bug:true},
+      {n:3, t:'        return errors[0]'},
+      {n:4, t:'    return "No errors"'},
+      {n:5, t:''},
+      {n:6, t:'print(get_first_error([]))'},
+    ],
+    hint: "What happens when `errors` is an empty list before you ever index into it?",
+    options: [
+      "Change `if errors[0]:` to `if errors:`",
+      "Change `errors[0]` in both lines to `errors[-1]`",
+      'Change `return "No errors"` to `return errors[0]`',
+      "Change `def get_first_error(errors):` to `def get_first_error(errors=[0]):`",
+    ],
+    correct: 0,
+    explain: "Indexing `errors[0]` on an empty list raises an IndexError before the function ever gets a chance to return the fallback message. Checking truthiness of the list itself (`if errors:`) safely handles the empty case first."
+  },
+  {
+    file: "closures.py",
+    title: "The multiplier that forgot its number",
+    difficulty: "hard",
+    code: [
+      {n:1, t:'def make_multipliers():'},
+      {n:2, t:'    funcs = []'},
+      {n:3, t:'    for i in range(3):'},
+      {n:4, t:'        funcs.append(lambda x: x * i)', bug:true},
+      {n:5, t:'    return funcs'},
+      {n:6, t:''},
+      {n:7, t:'fns = make_multipliers()'},
+      {n:8, t:'print([f(10) for f in fns])'},
+    ],
+    hint: "A closure captures the variable `i` itself, not its value at creation time. What is `i` once the loop finishes?",
+    options: [
+      "Change `lambda x: x * i` to `lambda x, i=i: x * i`",
+      "Change `for i in range(3):` to `for i in range(3, 0, -1):`",
+      "Change `funcs.append(lambda x: x * i)` to `funcs.append(lambda x: x * 3)`",
+      "Change `return funcs` to `return funcs[::-1]`",
+    ],
+    correct: 0,
+    explain: "All three lambdas share the same variable `i` by reference, not by value, so by the time they're called the loop has finished and `i` is 2 for all of them. Giving each lambda its own default argument (`i=i`) captures the current value at creation time instead."
+  },
+  {
+    file: "board_copy.py",
+    title: "The copy that wasn't really a copy",
+    difficulty: "hard",
+    code: [
+      {n:1, t:'import copy'},
+      {n:2, t:''},
+      {n:3, t:'def duplicate_board(board):'},
+      {n:4, t:'    return copy.copy(board)', bug:true},
+      {n:5, t:''},
+      {n:6, t:'board = [[0, 0], [0, 0]]'},
+      {n:7, t:'new_board = duplicate_board(board)'},
+      {n:8, t:'new_board[0][0] = 1'},
+      {n:9, t:'print(board)'},
+    ],
+    hint: "`copy.copy` makes a new outer list — but does it make new inner lists too?",
+    options: [
+      "Change `copy.copy(board)` to `copy.deepcopy(board)`",
+      "Change `copy.copy(board)` to `board[:]`",
+      "Change `new_board[0][0] = 1` to `new_board = [[1, 0], [0, 0]]`",
+      "Change `import copy` to `from copy import deepcopy as copy`",
+    ],
+    correct: 0,
+    explain: "`copy.copy` is a shallow copy: it copies the outer list but the inner lists are still shared by reference, so editing `new_board`'s row also edits `board`'s. `copy.deepcopy` recursively copies the nested lists too, so the two boards become fully independent."
+  },
+  {
+    file: "even_stream.py",
+    title: "The generator that ran dry",
+    difficulty: "hard",
+    code: [
+      {n:1, t:'def get_evens(nums):'},
+      {n:2, t:'    return (n for n in nums if n % 2 == 0)'},
+      {n:3, t:''},
+      {n:4, t:'evens = get_evens([1, 2, 3, 4, 5, 6])', bug:true},
+      {n:5, t:'total = sum(evens)'},
+      {n:6, t:'count = sum(1 for _ in evens)'},
+      {n:7, t:'print(total, count)'},
+    ],
+    hint: "Once a generator has been fully consumed by `sum()`, what's left in it to iterate over a second time?",
+    options: [
+      "Change `evens = get_evens(...)` to `evens = list(get_evens(...))`",
+      "Change `total = sum(evens)` to `total = sum(evens) * 2`",
+      "Change `count = sum(1 for _ in evens)` to `count = len(evens)`",
+      "Change `get_evens(nums)` to `get_evens(nums) * 2`",
+    ],
+    correct: 0,
+    explain: "A generator can only be iterated once — the first `sum(evens)` exhausts it completely, so the second pass finds nothing left and `count` comes out 0. Materializing it into a list first lets it be iterated as many times as needed."
+  },
+  {
+    file: "sum_check.py",
+    title: "The sum that shouldn't lie",
+    difficulty: "hard",
+    code: [
+      {n:1, t:'def total_is_correct(a, b, expected):'},
+      {n:2, t:'    return a + b == expected', bug:true},
+      {n:3, t:''},
+      {n:4, t:'print(total_is_correct(0.1, 0.2, 0.3))'},
+    ],
+    hint: "Can every decimal number be represented exactly in binary floating point?",
+    options: [
+      "Import `math` and change `a + b == expected` to `math.isclose(a + b, expected)`",
+      "Change `a + b == expected` to `round(a + b) == round(expected)`",
+      "Change `0.1, 0.2, 0.3` to `1, 2, 3`",
+      "Change `a + b == expected` to `a + b is expected`",
+    ],
+    correct: 0,
+    explain: "`0.1 + 0.2` doesn't equal `0.3` exactly in binary floating point — it's a tiny bit off — so `==` returns False. `math.isclose()` compares with a small tolerance, which is the correct way to compare floats."
+  },
+  {
+    file: "math_helper.py",
+    title: "The static method that wanted a self",
+    difficulty: "hard",
+    code: [
+      {n:1, t:'class MathHelper:'},
+      {n:2, t:'    @staticmethod'},
+      {n:3, t:'    def square(self, x):', bug:true},
+      {n:4, t:'        return x * x'},
+      {n:5, t:''},
+      {n:6, t:'print(MathHelper.square(5))'},
+    ],
+    hint: "A `@staticmethod` doesn't receive an automatic first argument the way instance methods do — so what is `self` actually holding here?",
+    options: [
+      "Remove the `self` parameter: `def square(x):`",
+      "Change `@staticmethod` to `@classmethod`",
+      "Change `MathHelper.square(5)` to `MathHelper().square(5)`",
+      "Change `def square(self, x):` to `def square(self, x=5):`",
+    ],
+    correct: 0,
+    explain: "`@staticmethod` methods don't get an implicit first argument at all, so calling `square(5)` passes `5` into the `self` slot and leaves `x` unfilled, raising a TypeError. Static methods should only take the parameters they actually need."
+  },
+  {
+    file: "animals.py",
+    title: "The subclass that lost its name",
+    difficulty: "hard",
+    code: [
+      {n:1, t:'class Animal:'},
+      {n:2, t:'    def __init__(self, name):'},
+      {n:3, t:'        self.name = name'},
+      {n:4, t:'        self.sound = "..."'},
+      {n:5, t:''},
+      {n:6, t:'class Dog(Animal):'},
+      {n:7, t:'    def __init__(self, name):'},
+      {n:8, t:'        self.sound = "Woof"', bug:true},
+      {n:9, t:''},
+      {n:10, t:'d = Dog("Rex")'},
+      {n:11, t:'print(d.name)'},
+    ],
+    hint: "`Dog.__init__` never calls the parent class's `__init__` — so does `self.name` ever actually get set?",
+    options: [
+      "Add `super().__init__(name)` at the start of `Dog.__init__`",
+      "Change `self.sound = \"Woof\"` to `self.name = name`",
+      "Change `class Dog(Animal):` to `class Dog:`",
+      "Change `d = Dog(\"Rex\")` to `d = Animal(\"Rex\")`",
+    ],
+    correct: 0,
+    explain: "Overriding `__init__` in `Dog` without calling the parent's `__init__` means `Animal`'s setup code — including `self.name = name` — never runs, so `d.name` doesn't exist. `super().__init__(name)` runs the parent's constructor first."
+  },
+  {
+    file: "point_set.py",
+    title: "The point that couldn't be hashed",
+    difficulty: "hard",
+    code: [
+      {n:1, t:'class Point:'},
+      {n:2, t:'    def __init__(self, x, y):'},
+      {n:3, t:'        self.x, self.y = x, y'},
+      {n:4, t:'    def __eq__(self, other):', bug:true},
+      {n:5, t:'        return self.x == other.x and self.y == other.y'},
+      {n:6, t:''},
+      {n:7, t:'points = {Point(1, 2), Point(1, 2)}'},
+      {n:8, t:'print(len(points))'},
+    ],
+    hint: "Defining `__eq__` on a class quietly disables its default `__hash__`. What does that mean for putting instances in a set?",
+    options: [
+      "Add a matching `__hash__` method: `def __hash__(self): return hash((self.x, self.y))`",
+      "Change `{Point(1, 2), Point(1, 2)}` to `[Point(1, 2), Point(1, 2)]`",
+      "Remove the `__eq__` method entirely",
+      "Change `def __eq__(self, other):` to `def __eq__(self, other=None):`",
+    ],
+    correct: 0,
+    explain: "Once a class defines `__eq__`, Python sets its `__hash__` to None unless you define one too, making instances unhashable — and a set needs to hash its elements. Defining `__hash__` to match `__eq__` (same fields) fixes it and lets the set correctly treat equal points as one."
+  },
+  {
+    file: "grid_init.py",
+    title: "The grid where every row was the same row",
+    difficulty: "hard",
+    code: [
+      {n:1, t:'grid = [[0] * 3] * 3', bug:true},
+      {n:2, t:'grid[0][0] = 1'},
+      {n:3, t:'print(grid)'},
+    ],
+    hint: "Does `[[0] * 3] * 3` create three separate inner lists, or three references to the same one?",
+    options: [
+      "Change `[[0] * 3] * 3` to `[[0] * 3 for _ in range(3)]`",
+      "Change `grid[0][0] = 1` to `grid[0] = [1, 0, 0]`",
+      "Change `[[0] * 3] * 3` to `[0] * 3 * 3`",
+      "Change `print(grid)` to `print(grid[0])`",
+    ],
+    correct: 0,
+    explain: "`[[0] * 3] * 3` repeats the *same* inner list object three times, so editing one row edits all of them. A list comprehension (`for _ in range(3)`) builds three genuinely separate inner lists instead."
+  },
+  {
+    file: "logger_decorator.py",
+    title: "The decorator that stole a name",
+    difficulty: "hard",
+    code: [
+      {n:1, t:'def logger(func):'},
+      {n:2, t:'    def wrapper(*args, **kwargs):', bug:true},
+      {n:3, t:'        print(f"Calling {func.__name__}")'},
+      {n:4, t:'        return func(*args, **kwargs)'},
+      {n:5, t:'    return wrapper'},
+      {n:6, t:''},
+      {n:7, t:'@logger'},
+      {n:8, t:'def greet(name):'},
+      {n:9, t:'    return f"Hello, {name}"'},
+      {n:10, t:''},
+      {n:11, t:'print(greet.__name__)'},
+    ],
+    hint: "After decoration, `greet` actually points at the `wrapper` function. Does `wrapper` know it's pretending to be `greet`?",
+    options: [
+      "Add `import functools` and decorate `wrapper` with `@functools.wraps(func)`",
+      "Change `def wrapper(*args, **kwargs):` to `def greet(*args, **kwargs):`",
+      "Change `print(greet.__name__)` to `print(greet.__qualname__)`",
+      "Change `return wrapper` to `return wrapper.__name__`",
+    ],
+    correct: 0,
+    explain: "The decorator replaces `greet` with `wrapper`, and without help `wrapper` carries its own name and metadata, not `greet`'s — so `greet.__name__` prints \"wrapper\". `functools.wraps(func)` copies the original function's metadata onto the wrapper."
+  },
+  {
+    file: "record_parser.py",
+    title: "The parser that assumed too much",
+    difficulty: "hard",
+    code: [
+      {n:1, t:'def parse_record(line):'},
+      {n:2, t:'    name, age, city = line.split(",")', bug:true},
+      {n:3, t:'    return name, age, city'},
+      {n:4, t:''},
+      {n:5, t:'print(parse_record("Alice,30"))'},
+    ],
+    hint: "This line always expects exactly 3 comma-separated fields to unpack into. What if the input only has 2?",
+    options: [
+      'Use `name, age, *rest = line.split(",")` and fall back to `"Unknown"` when `rest` is empty',
+      'Change `line.split(",")` to `line.split(",", 3)`',
+      'Change `name, age, city = line.split(",")` to `name, age, city = line`',
+      'Change `return name, age, city` to `return name, age, city or "Unknown"`',
+    ],
+    correct: 0,
+    explain: "Unpacking always expects exactly as many values as variables — with only 2 fields in the input, assigning to 3 variables raises a ValueError. Using a star expression (`*rest`) accepts a variable number of trailing fields and lets missing ones be handled gracefully."
+  },
+  {
+    file: "counter_scope.py",
+    title: "The counter that wouldn't increment",
+    difficulty: "hard",
+    code: [
+      {n:1, t:'counter = 0'},
+      {n:2, t:''},
+      {n:3, t:'def increment():'},
+      {n:4, t:'    counter += 1', bug:true},
+      {n:5, t:'    return counter'},
+      {n:6, t:''},
+      {n:7, t:'print(increment())'},
+    ],
+    hint: "Assigning to a name anywhere inside a function makes Python treat it as local for the *whole* function — including on the line where you read it first.",
+    options: [
+      "Add `global counter` as the first line inside `increment`",
+      "Change `counter += 1` to `counter = counter + 1`",
+      "Change `def increment():` to `def increment(counter):`",
+      "Move `counter = 0` to inside the function",
+    ],
+    correct: 0,
+    explain: "Because `counter` is assigned to inside the function (`counter += 1`), Python treats it as a local variable throughout the function — so reading it before that assignment raises an UnboundLocalError. `global counter` tells Python to use the module-level variable instead of creating a local one.",
+  },
+  {
+    file: "temperature.py",
+    title: "The property that refused to be set",
+    difficulty: "hard",
+    code: [
+      {n:1, t:'class Temperature:'},
+      {n:2, t:'    def __init__(self, celsius):'},
+      {n:3, t:'        self._celsius = celsius'},
+      {n:4, t:'    @property'},
+      {n:5, t:'    def fahrenheit(self):'},
+      {n:6, t:'        return self._celsius * 9 / 5 + 32'},
+      {n:7, t:''},
+      {n:8, t:'temp = Temperature(25)'},
+      {n:9, t:'temp.fahrenheit = 100', bug:true},
+      {n:10, t:'print(temp.fahrenheit)'},
+    ],
+    hint: "A `@property` with no matching setter is read-only. What happens when you try to assign to it anyway?",
+    options: [
+      "Add a `@fahrenheit.setter` method that converts the new value back to Celsius",
+      "Change `temp.fahrenheit = 100` to `temp._celsius = 100`",
+      "Change `@property` to `@staticmethod`",
+      "Change `temp.fahrenheit = 100` to `temp.fahrenheit(100)`",
+    ],
+    correct: 0,
+    explain: "A `@property` without a paired setter is read-only, so assigning `temp.fahrenheit = 100` raises an AttributeError. Adding a `@fahrenheit.setter` method defines how that assignment should update the object's underlying state."
+  },
+  {
+    file: "number_check.py",
+    title: "The number check that let booleans through",
+    difficulty: "hard",
+    code: [
+      {n:1, t:'def is_number(x):'},
+      {n:2, t:'    return isinstance(x, int)', bug:true},
+      {n:3, t:''},
+      {n:4, t:'print(is_number(True))'},
+    ],
+    hint: "In Python, `bool` is a subclass of `int`. Does `isinstance(True, int)` come back True or False?",
+    options: [
+      "Change to `isinstance(x, int) and not isinstance(x, bool)`",
+      "Change `isinstance(x, int)` to `type(x) != bool`",
+      "Change `isinstance(x, int)` to `x == 1 or x == 0`",
+      "Change `isinstance(x, int)` to `isinstance(x, (int, float))`",
+    ],
+    correct: 0,
+    explain: "Because `bool` is a subclass of `int` in Python, `isinstance(True, int)` is True, so this wrongly accepts booleans as numbers. Explicitly excluding `bool` with `not isinstance(x, bool)` closes that gap."
+  },
+  {
+    file: "list_aliasing.py",
+    title: "The two lists that were secretly one",
+    difficulty: "hard",
+    code: [
+      {n:1, t:'def create_lists():'},
+      {n:2, t:'    list_a = list_b = []', bug:true},
+      {n:3, t:'    list_a.append(1)'},
+      {n:4, t:'    return list_a, list_b'},
+      {n:5, t:''},
+      {n:6, t:'print(create_lists())'},
+    ],
+    hint: "A chained assignment like `a = b = []` — does it create one list or two?",
+    options: [
+      "Split it into two separate assignments: `list_a = []` then `list_b = []`",
+      "Change `list_a.append(1)` to `list_a = list_a + [1]`",
+      "Change `return list_a, list_b` to `return list_a.copy(), list_b`",
+      "Change `list_a = list_b = []` to `list_a, list_b = [], [],`",
+    ],
+    correct: 0,
+    explain: "`list_a = list_b = []` points both names at the exact same list object, so appending to `list_a` also shows up in `list_b`. Assigning two separate empty lists gives each variable its own independent list."
+  },
+  {
+    file: "flatten_list.py",
+    title: "The flatten that didn't flatten",
+    difficulty: "hard",
+    code: [
+      {n:1, t:'def flatten(lst):'},
+      {n:2, t:'    result = []'},
+      {n:3, t:'    for item in lst:'},
+      {n:4, t:'        if isinstance(item, list):'},
+      {n:5, t:'            result.append(flatten(item))', bug:true},
+      {n:6, t:'        else:'},
+      {n:7, t:'            result.append(item)'},
+      {n:8, t:'    return result'},
+      {n:9, t:''},
+      {n:10, t:'print(flatten([1, [2, 3], [4, [5, 6]]]))'},
+    ],
+    hint: "The recursive call already returns a flat list of its own — does adding that list as one element keep it flat, or nest it again?",
+    options: [
+      "Change `result.append(flatten(item))` to `result.extend(flatten(item))`",
+      "Change `isinstance(item, list)` to `isinstance(item, (list, tuple))`",
+      "Change `result.append(item)` to `result.extend(item)`",
+      "Change `return result` to `return flatten(result)`",
+    ],
+    correct: 0,
+    explain: "`flatten(item)` already returns a fully flattened list, but `.append()` adds that whole list back in as a single nested element, undoing the work. `.extend()` merges its individual items into `result` instead, actually flattening the structure."
+  },
+  {
+    file: "add_numbers.py",
+    title: "The function that forgot to answer",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def add(a, b):'},
+      {n:2, t:'    result = a + b', bug:true},
+      {n:3, t:''},
+      {n:4, t:'print(add(2, 3))'},
+    ],
+    hint: "The function computes `result` — but does it ever hand that value back to the caller?",
+    options: [
+      "Add `return result` at the end of the function",
+      "Change `result = a + b` to `print(a + b)`",
+      "Change `print(add(2, 3))` to `print(result)`",
+      "Change `def add(a, b):` to `def add(a, b, result):`",
+    ],
+    correct: 0,
+    explain: "Without a `return` statement, a Python function returns `None` by default — `result` is computed but never sent back to the caller. Adding `return result` fixes it."
+  },
+  {
+    file: "first_item.py",
+    title: "The first fruit that wasn't first",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'fruits = ["apple", "banana", "cherry"]'},
+      {n:2, t:'print("First fruit:", fruits[1])', bug:true},
+    ],
+    hint: "What index does the first item in a Python list actually have?",
+    options: [
+      "Change `fruits[1]` to `fruits[0]`",
+      "Change `fruits[1]` to `fruits[-1]`",
+      'Change `fruits = [...]` to `fruits = {"apple", "banana", "cherry"}`',
+      "Change `fruits[1]` to `fruits.first()`",
+    ],
+    correct: 0,
+    explain: "Python lists are zero-indexed, so `fruits[1]` is the second item (\"banana\"), not the first. `fruits[0]` gets the actual first item."
+  },
+  {
+    file: "sum_to_n.py",
+    title: "The sum that came up short",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def sum_to_n(n):'},
+      {n:2, t:'    total = 0'},
+      {n:3, t:'    for i in range(n):', bug:true},
+      {n:4, t:'        total += i'},
+      {n:5, t:'    return total'},
+      {n:6, t:''},
+      {n:7, t:'print(sum_to_n(5))'},
+    ],
+    hint: "`range(n)` produces 0, 1, 2, ..., up to but not including `n`. Is that the same as counting 1 through `n`?",
+    options: [
+      "Change `range(n)` to `range(1, n + 1)`",
+      "Change `range(n)` to `range(n + 1)`",
+      "Change `total += i` to `total += i + 1`",
+      "Change `return total` to `return total + n`",
+    ],
+    correct: 0,
+    explain: "`range(n)` counts from 0 up to `n - 1`, so `sum_to_n(5)` adds 0+1+2+3+4 = 10 instead of 1+2+3+4+5 = 15. `range(1, n + 1)` counts 1 through `n` inclusive."
+  },
+  {
+    file: "join_words.py",
+    title: "The sentence that lost its words",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def join_words(words):'},
+      {n:2, t:'    sentence = ""'},
+      {n:3, t:'    for word in words:'},
+      {n:4, t:'        sentence = word + " "', bug:true},
+      {n:5, t:'    return sentence.strip()'},
+      {n:6, t:''},
+      {n:7, t:'print(join_words(["Hello", "world", "!"]))'},
+    ],
+    hint: "Does `sentence = word + \" \"` add to the sentence so far, or replace it?",
+    options: [
+      "Change `sentence = word + \" \"` to `sentence += word + \" \"`",
+      'Change `sentence = ""` to `sentence = []`',
+      "Change `return sentence.strip()` to `return sentence`",
+      "Change `for word in words:` to `for word in words[::-1]:`",
+    ],
+    correct: 0,
+    explain: "`sentence = word + \" \"` overwrites `sentence` on every loop instead of building it up, so only the last word survives. `sentence += word + \" \"` appends each word instead of replacing the whole thing."
+  },
+  {
+    file: "count_items.py",
+    title: "The undefined counter",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'numbers = [4, 8, 15, 16, 23, 42]'},
+      {n:2, t:'print("Total items:", length(numbers))', bug:true},
+    ],
+    hint: "Is `length` an actual Python function, or is there a different built-in for this?",
+    options: [
+      "Change `length(numbers)` to `len(numbers)`",
+      "Change `length(numbers)` to `numbers.length()`",
+      "Change `length(numbers)` to `numbers.length`",
+      "Change `numbers = [...]` to `numbers = len([4, 8, 15, 16, 23, 42])`",
+    ],
+    correct: 0,
+    explain: "Python has no built-in function called `length` — the correct one is `len()`. Calling an undefined name raises a NameError."
+  },
+  {
+    file: "freezing_check.py",
+    title: "The freezing check that had it backwards",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def is_freezing(temp_c):'},
+      {n:2, t:'    if temp_c > 0:', bug:true},
+      {n:3, t:'        return True'},
+      {n:4, t:'    return False'},
+      {n:5, t:''},
+      {n:6, t:'print(is_freezing(-5))'},
+    ],
+    hint: "Water freezes at 0°C and below — does `temp_c > 0` describe freezing temperatures, or the opposite?",
+    options: [
+      "Change `temp_c > 0` to `temp_c <= 0`",
+      "Change `temp_c > 0` to `temp_c >= 0`",
+      "Swap the `return True` and `return False` lines",
+      "Change `is_freezing(-5)` to `is_freezing(5)`",
+    ],
+    correct: 0,
+    explain: "The condition is backwards: `temp_c > 0` is true for warm temperatures, not freezing ones, so `is_freezing(-5)` wrongly returns False. Freezing means 0°C or below, so the check should be `temp_c <= 0`."
+  },
+  {
+    file: "double_all.py",
+    title: "The one-too-far index",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def double_all(numbers):'},
+      {n:2, t:'    return [n * 2 for n in numbers]'},
+      {n:3, t:''},
+      {n:4, t:'result = double_all([1, 2, 3])'},
+      {n:5, t:'print(result[3])', bug:true},
+    ],
+    hint: "`result` has 3 items. What indices does a 3-item list actually have?",
+    options: [
+      "Change `result[3]` to `result[-1]`",
+      "Change `result[3]` to `result[4]`",
+      "Change `double_all([1, 2, 3])` to `double_all([1, 2, 3, 4])`",
+      "Change `return [n * 2 for n in numbers]` to `return [n * 2 for n in numbers + [0]]`",
+    ],
+    correct: 0,
+    explain: "A 3-item list only has valid indices 0, 1, and 2 — `result[3]` reaches one past the end and raises an IndexError. `result[-1]` correctly gets the last item."
+  },
+  {
+    file: "find_min.py",
+    title: "The minimum that returned the maximum",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def find_min(a, b, c):'},
+      {n:2, t:'    smallest = a'},
+      {n:3, t:'    if b < smallest:'},
+      {n:4, t:'        smallest = b'},
+      {n:5, t:'    if c > smallest:', bug:true},
+      {n:6, t:'        smallest = c'},
+      {n:7, t:'    return smallest'},
+      {n:8, t:''},
+      {n:9, t:'print(find_min(5, 2, 8))'},
+    ],
+    hint: "The first comparison uses `<` to look for something smaller. Does the second comparison do the same thing?",
+    options: [
+      "Change `if c > smallest:` to `if c < smallest:`",
+      "Change `if c > smallest:` to `if c >= smallest:`",
+      "Change `smallest = a` to `smallest = min(a, b, c)`",
+      "Change `if b < smallest:` to `if b > smallest:`",
+    ],
+    correct: 0,
+    explain: "The final check uses `>` instead of `<`, so instead of updating `smallest` only when `c` is smaller, it updates when `c` is *larger* — turning the function into a mix of min and max logic. Changing it to `<` keeps the comparison consistent with finding the minimum."
+  },
+  {
+    file: "times_table.py",
+    title: "The table that stopped one row early",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'for i in range(1, 5):', bug:true},
+      {n:2, t:'    print(f"3 x {i} = {3 * i}")'},
+    ],
+    hint: "The table is supposed to go up to \"3 x 5\". Does `range(1, 5)` include 5?",
+    options: [
+      "Change `range(1, 5)` to `range(1, 6)`",
+      "Change `range(1, 5)` to `range(0, 5)`",
+      "Change `3 * i` to `3 * (i + 1)`",
+      "Change `range(1, 5)` to `range(5, 1)`",
+    ],
+    correct: 0,
+    explain: "`range(1, 5)` stops at 4, so the row for \"3 x 5\" never prints. `range(1, 6)` includes 5 as the last value."
+  },
+  {
+    file: "sorted_copy.py",
+    title: "The copy that changed the original",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def get_sorted_copy(numbers):'},
+      {n:2, t:'    numbers.sort()', bug:true},
+      {n:3, t:'    return numbers'},
+      {n:4, t:''},
+      {n:5, t:'original = [3, 1, 2]'},
+      {n:6, t:'sorted_list = get_sorted_copy(original)'},
+      {n:7, t:'print("Original:", original)'},
+    ],
+    hint: "Does `.sort()` return a new sorted list, or rearrange the existing one in place?",
+    options: [
+      "Change `numbers.sort(); return numbers` to `return sorted(numbers)`",
+      "Change `numbers.sort()` to `numbers.sort(reverse=True)`",
+      "Change `return numbers` to `return numbers.copy()`",
+      "Change `original = [3, 1, 2]` to `original = (3, 1, 2)`",
+    ],
+    correct: 0,
+    explain: "`.sort()` rearranges the list in place, so it also changes `original` even though the function was only meant to return a sorted copy. `sorted(numbers)` returns a brand-new sorted list and leaves the original untouched."
+  },
+  {
+    file: "get_initial.py",
+    title: "The initial that missed the first letter",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def get_initial(name):'},
+      {n:2, t:'    return name[1]', bug:true},
+      {n:3, t:''},
+      {n:4, t:'print(get_initial("Alice"))'},
+    ],
+    hint: "Which index holds the very first character of a string?",
+    options: [
+      "Change `name[1]` to `name[0]`",
+      "Change `name[1]` to `name[-1]`",
+      "Change `name[1]` to `name[1:]`",
+      'Change `get_initial("Alice")` to `get_initial("Alice")[0]`',
+    ],
+    correct: 0,
+    explain: "Strings are zero-indexed just like lists, so `name[1]` is the second character (\"l\"), not the first. `name[0]` gets the actual first letter."
+  },
+  {
+    file: "remove_duplicates.py",
+    title: "The duplicate remover that kept only duplicates",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def remove_duplicates(items):'},
+      {n:2, t:'    unique = []'},
+      {n:3, t:'    for item in items:'},
+      {n:4, t:'        if item in unique:', bug:true},
+      {n:5, t:'            unique.append(item)'},
+      {n:6, t:'    return unique'},
+      {n:7, t:''},
+      {n:8, t:'print(remove_duplicates([1, 2, 2, 3, 1]))'},
+    ],
+    hint: "Should an item be added to `unique` when it's already there, or when it isn't?",
+    options: [
+      "Change `if item in unique:` to `if item not in unique:`",
+      "Change `unique = []` to `unique = items`",
+      "Change `unique.append(item)` to `unique.remove(item)`",
+      "Change `for item in items:` to `for item in set(items):`",
+    ],
+    correct: 0,
+    explain: "The condition is backwards: it only appends an item when it's *already* in `unique`, but since `unique` starts empty, nothing is ever already there, so nothing ever gets added — the result is always an empty list. `not in` correctly adds each item the first time it's seen."
+  },
+  {
+    file: "reverse_list.py",
+    title: "The reverse that skipped half the list",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def reverse_list(items):'},
+      {n:2, t:'    return items[::-2]', bug:true},
+      {n:3, t:''},
+      {n:4, t:'print(reverse_list([1, 2, 3, 4, 5]))'},
+    ],
+    hint: "A step of -2 walks backward two positions at a time. Is that the same as simply reversing?",
+    options: [
+      "Change `items[::-2]` to `items[::-1]`",
+      "Change `items[::-2]` to `items[::2]`",
+      "Change `items[::-2]` to `items[-2::]`",
+      "Change `return items[::-2]` to `return list(reversed(items))[::2]`",
+    ],
+    correct: 0,
+    explain: "A step of -2 walks backward two elements at a time, skipping every other item, so it returns `[5, 3, 1]` instead of the full reversed list. A step of -1 walks backward one element at a time, reversing the whole list."
+  },
+  {
+    file: "find_maximum.py",
+    title: "The maximum that reported the minimum",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'numbers = [3, 7, 2, 9, 4]'},
+      {n:2, t:'print("Maximum:", min(numbers))', bug:true},
+    ],
+    hint: "Which built-in function finds the largest value in a list — is it the one used here?",
+    options: [
+      "Change `min(numbers)` to `max(numbers)`",
+      "Change `min(numbers)` to `min(numbers, reverse=True)`",
+      "Change `numbers = [...]` to `numbers = sorted([3, 7, 2, 9, 4])`",
+      "Change `min(numbers)` to `numbers.min()`",
+    ],
+    correct: 0,
+    explain: "`min()` returns the smallest value in the list, not the largest, so this prints 2 while labeling it \"Maximum\". `max()` is the correct function for finding the largest value."
+  },
+  {
+    file: "first_three.py",
+    title: "The slice that skipped the first item",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def first_three(items):'},
+      {n:2, t:'    return items[1:3]', bug:true},
+      {n:3, t:''},
+      {n:4, t:'print(first_three([10, 20, 30, 40, 50]))'},
+    ],
+    hint: "A slice `[1:3]` starts at index 1. Where does the very first item of the list live?",
+    options: [
+      "Change `items[1:3]` to `items[0:3]`",
+      "Change `items[1:3]` to `items[1:4]`",
+      "Change `items[1:3]` to `items[-3:]`",
+      "Change `items[1:3]` to `items[:1]`",
+    ],
+    correct: 0,
+    explain: "`items[1:3]` starts at index 1, skipping the actual first element at index 0, and returns `[20, 30]` instead of the first three items. `items[0:3]` (or `items[:3]`) starts from the beginning."
+  },
+];
+
+// Three sequential rounds, each with its own mix of difficulties and its own
+// size. Rounds are gated by the organizer via the backend: a round must be
+// marked "open" there before anyone can play it, and advancing past Round 1
+// or Round 2 requires ranking inside that round's cutoff (checked server-side).
+const LEVELS = [
+  { number: 1, label: "Round 1 — Warm-up",       composition: { easy: 15 } },
+  { number: 2, label: "Round 2 — Stepping Up",   composition: { easy: 8, medium: 2 } },
+  { number: 3, label: "Round 3 — Final Stretch", composition: { easy: 4, medium: 2, hard: 2 } },
+];
+LEVELS.forEach(level => {
+  level.count = Object.values(level.composition).reduce((sum, n) => sum + n, 0);
+});
+function levelByNumber(n){ return LEVELS.find(l => l.number === n); }
+
+// Later rounds are worth more per correct answer, on top of the speed bonus.
+const DIFFICULTY_MULTIPLIER = { easy: 1, medium: 1.3, hard: 1.6 };
+let CASES = [];
+
+function shuffleArray(arr){
+  const shuffled = arr.slice();
+  for(let i = shuffled.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+// Draws one round's composition from the pool, excluding any case file this
+// player has already seen in an earlier round (tracked in localStorage so it
+// survives the page reload that happens during the real-world break between
+// rounds).
+function pickCasesForLevel(pool, levelNumber, excludeFiles){
+  const level = levelByNumber(levelNumber);
+  const exclude = new Set(excludeFiles || []);
+  const levelCases = [];
+  Object.entries(level.composition).forEach(([difficulty, count]) => {
+    const available = pool.filter(c => c.difficulty === difficulty && !exclude.has(c.file));
+    const picks = shuffleArray(available).slice(0, count);
+    levelCases.push(...picks);
+  });
+  return shuffleArray(levelCases);
+}
+
+// --- Local (per-browser) memory of which case files this player has already
+// seen, keyed by name. This is a convenience to avoid repeat questions across
+// rounds — the authoritative record of scores/progress lives on the backend.
+function usedFilesKey(name){ return `segfault_used_${name}`; }
+function getUsedFiles(name){
+  try{
+    const raw = localStorage.getItem(usedFilesKey(name));
+    return raw ? JSON.parse(raw) : [];
+  }catch(e){ return []; }
+}
+function addUsedFiles(name, files){
+  try{
+    const existing = getUsedFiles(name);
+    localStorage.setItem(usedFilesKey(name), JSON.stringify(existing.concat(files)));
+  }catch(e){ /* storage unavailable — non-critical, just means possible repeats */ }
+}
+
+const ROUND_SECONDS = 45;
+
+// Paste your deployed Google Apps Script Web App URL here (ends in /exec).
+// Deploy > New deployment > Web app > Execute as Me > Access: Anyone.
+// Leave the placeholder as-is to run the game in unrestricted practice mode
+// (no elimination — anyone can play any round any time).
+const LEADERBOARD_API = "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
+
+let state = {
+  name: "",
+  currentLevelNumber: null,
+  round: 0,
+  score: 0,
+  correctCount: 0,
+  levelStartedAt: null,
+  roundTimer: null,
+  timeLeft: ROUND_SECONDS,
+  roundStartedAt: 0,
+  hintUsed: false,
+  answered: false,
+  perRoundResult: [],
+  lobbyPollTimer: null,
+};
+
+const el = id => document.getElementById(id);
+
+function escapeHtml(s){
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// Tokenizes a line of Python into {text, cls} pieces. No HTML strings are
+// ever built here — every token becomes a real DOM node, so there is
+// nothing for any renderer/sanitizer to mis-parse into visible tag text.
+const PY_KEYWORDS = new Set(["def","return","if","else","elif","for","while","in","True","False","None","import"]);
+
+function tokenizeLine(line){
+  const tokens = [];
+  let i = 0;
+  const n = line.length;
+  while(i < n){
+    const ch = line[i];
+
+    // comment runs to end of line
+    if(ch === '#'){
+      tokens.push({text: line.slice(i), cls: 'cm'});
+      break;
+    }
+    // string literal
+    if(ch === '"'){
+      let j = i + 1;
+      while(j < n && line[j] !== '"'){
+        if(line[j] === '\\') j++;
+        j++;
+      }
+      j = Math.min(j + 1, n);
+      tokens.push({text: line.slice(i, j), cls: 'str'});
+      i = j;
+      continue;
+    }
+    // number
+    if(/[0-9]/.test(ch)){
+      let j = i;
+      while(j < n && /[0-9.]/.test(line[j])) j++;
+      tokens.push({text: line.slice(i, j), cls: 'num'});
+      i = j;
+      continue;
+    }
+    // word (identifier / keyword)
+    if(/[A-Za-z_]/.test(ch)){
+      let j = i;
+      while(j < n && /[A-Za-z0-9_]/.test(line[j])) j++;
+      const word = line.slice(i, j);
+      tokens.push({text: word, cls: PY_KEYWORDS.has(word) ? 'kw' : null});
+      i = j;
+      continue;
+    }
+    // whitespace / punctuation — batch consecutive plain chars together
+    let j = i;
+    while(j < n && !/[A-Za-z0-9_"#]/.test(line[j])) j++;
+    tokens.push({text: line.slice(i, j), cls: null});
+    i = j;
+  }
+  return tokens;
+}
+
+function renderCode(caseData){
+  const codeBlock = el('code-block');
+  codeBlock.innerHTML = "";
+
+  caseData.code.forEach((l, idx) => {
+    const lineWrap = document.createElement('span');
+    lineWrap.className = l.bug ? "bugline" : "";
+
+    const lnSpan = document.createElement('span');
+    lnSpan.className = "ln";
+    lnSpan.textContent = String(l.n).padStart(2, '0');
+    lineWrap.appendChild(lnSpan);
+
+    tokenizeLine(l.t).forEach(tok => {
+      if(tok.cls){
+        const span = document.createElement('span');
+        span.className = tok.cls;
+        span.textContent = tok.text;
+        lineWrap.appendChild(span);
+      } else {
+        lineWrap.appendChild(document.createTextNode(tok.text));
+      }
+    });
+
+    codeBlock.appendChild(lineWrap);
+    if(idx < caseData.code.length - 1){
+      codeBlock.appendChild(document.createTextNode("\n"));
+    }
+  });
+
+  el('code-fname').textContent = caseData.file;
+}
+
+function renderProgress(){
+  const track = el('progress-track');
+  track.innerHTML = "";
+  for(let i=0;i<CASES.length;i++){
+    const dot = document.createElement('div');
+    dot.className = "bug-dot";
+    if(state.perRoundResult[i] === 'correct') dot.className += " done-correct";
+    else if(state.perRoundResult[i] === 'wrong') dot.className += " done-wrong";
+    else if(i === state.round) dot.className += " current";
+    track.appendChild(dot);
+  }
+}
+
+function startRound(){
+  const c = CASES[state.round];
+  const level = levelByNumber(state.currentLevelNumber);
+  state.answered = false;
+  state.hintUsed = false;
+  state.timeLeft = ROUND_SECONDS;
+  state.roundStartedAt = Date.now();
+
+  el('case-id').textContent = `${level.label.toUpperCase()} · CASE ${state.round + 1} / ${level.count}`;
+  el('case-title').textContent = c.title;
+  const diffBadge = el('case-difficulty');
+  diffBadge.textContent = c.difficulty.toUpperCase();
+  diffBadge.className = "diff-badge " + c.difficulty;
+  el('timer-ring').textContent = ROUND_SECONDS + "s";
+  el('timer-ring').classList.remove('low');
+  el('btn-next').classList.add('hidden');
+  el('feedback').classList.remove('show','correct','wrong');
+  el('btn-hint').style.display = "inline-block";
+  const existingHint = document.querySelector('.hint-text');
+  if(existingHint) existingHint.remove();
+
+  renderCode(c);
+  renderProgress();
+
+  const optsWrap = el('options');
+  optsWrap.innerHTML = "";
+  const letters = ['A','B','C','D'];
+  c.options.forEach((optText, idx) => {
+    const btn = document.createElement('button');
+    btn.className = "opt";
+    btn.innerHTML = `<span class="tag">${letters[idx]}</span><span>${escapeHtml(optText)}</span>`;
+    btn.onclick = () => submitAnswer(idx);
+    optsWrap.appendChild(btn);
+  });
+
+  clearInterval(state.roundTimer);
+  state.roundTimer = setInterval(tick, 1000);
+
+  el('sb-round').textContent = `${state.round}/${CASES.length}`;
+  el('sb-level').textContent = `RND ${level.number}/${LEVELS.length}`;
+}
+
+function tick(){
+  state.timeLeft -= 1;
+  el('timer-ring').textContent = state.timeLeft + "s";
+  if(state.timeLeft <= 10) el('timer-ring').classList.add('low');
+  if(state.timeLeft <= 0){
+    clearInterval(state.roundTimer);
+    if(!state.answered) submitAnswer(-1); // timeout
+  }
+}
+
+function submitAnswer(idx){
+  if(state.answered) return;
+  state.answered = true;
+  clearInterval(state.roundTimer);
+
+  const c = CASES[state.round];
+  const elapsed = (Date.now() - state.roundStartedAt) / 1000;
+  const opts = document.querySelectorAll('.opt');
+  opts.forEach((b, i) => {
+    b.disabled = true;
+    if(i === c.correct) b.classList.add('correct');
+    else if(i === idx) b.classList.add('wrong');
+  });
+
+  const fb = el('feedback');
+  fb.classList.add('show');
+
+  if(idx === c.correct){
+    let pts = Math.max(20, Math.round(100 - elapsed * 1.5));
+    pts = Math.round(pts * DIFFICULTY_MULTIPLIER[c.difficulty]);
+    if(state.hintUsed) pts = Math.round(pts * 0.6);
+    state.score += pts;
+    state.correctCount += 1;
+    state.perRoundResult[state.round] = 'correct';
+    fb.classList.add('correct');
+    fb.innerHTML = `<b>+${pts} pts.</b> ${c.explain}`;
+  } else {
+    state.perRoundResult[state.round] = 'wrong';
+    fb.classList.add('wrong');
+    const reason = idx === -1 ? "Time's up." : "Not quite.";
+    fb.innerHTML = `<b>${reason}</b> ${c.explain}`;
+  }
+
+  el('sb-score').textContent = state.score;
+  el('btn-hint').style.display = "none";
+  el('btn-next').classList.remove('hidden');
+  el('btn-next').textContent = state.round === CASES.length - 1 ? "Finish round" : "Next case";
+  renderProgress();
+}
+
+function useHint(){
+  if(state.answered || state.hintUsed) return;
+  state.hintUsed = true;
+  const c = CASES[state.round];
+  const hintEl = document.createElement('div');
+  hintEl.className = "hint-text";
+  hintEl.textContent = "// hint: " + c.hint;
+  el('btn-hint').insertAdjacentElement('afterend', hintEl);
+  el('btn-hint').style.display = "none";
+}
+
+function nextRound(){
+  state.round += 1;
+  if(state.round >= CASES.length){
+    finishLevel();
+  } else {
+    startRound();
+  }
+}
+
+// Called when a round's last case has been answered: stops the clock,
+// records which cases were used (so they won't repeat next round), submits
+// the round's score to the backend, then shows the submission-confirmation
+// screen.
+async function finishLevel(){
+  clearInterval(state.roundTimer);
+  const level = levelByNumber(state.currentLevelNumber);
+  const totalTime = Math.round((Date.now() - state.levelStartedAt) / 1000);
+
+  addUsedFiles(state.name, CASES.map(c => c.file));
+
+  el('screen-game').classList.add('hidden');
+  el('screen-level-complete').classList.remove('hidden');
+  el('lc-heading').textContent = `${level.label} submitted.`;
+  el('lc-sub').textContent = "// your score has been logged — waiting on the organizer for the next round";
+  el('lc-correct').textContent = `${state.correctCount}/${CASES.length}`;
+  el('lc-points').textContent = state.score;
+  el('lc-total').textContent = "…";
+
+  const result = await submitLevelScore(state.name, level.number, state.score, state.correctCount, totalTime);
+  if(result && typeof result.cumulativeScore === "number"){
+    el('lc-total').textContent = result.cumulativeScore;
+  } else {
+    el('lc-total').textContent = state.score;
+  }
+}
+
+async function submitLevelScore(name, level, score, correct, time){
+  if(!LEADERBOARD_API || LEADERBOARD_API.includes("PASTE_YOUR")){
+    console.warn("Leaderboard API URL not set — practice mode, nothing submitted.");
+    return null;
+  }
+  try{
+    // Sent as text/plain on purpose: a JSON content-type triggers a CORS
+    // preflight request that Apps Script web apps don't handle, so this
+    // avoids that entirely while Apps Script still parses the JSON body fine.
+    const res = await fetch(LEADERBOARD_API, {
+      method: "POST",
+      body: JSON.stringify({ action: "submit", name, level, score, correct, time }),
+    });
+    return await res.json();
+  }catch(e){
+    console.error("Could not submit score:", e);
+    return null;
+  }
+}
+
+async function fetchWhoAmI(name){
+  const res = await fetch(`${LEADERBOARD_API}?action=whoami&name=${encodeURIComponent(name)}`);
+  return await res.json();
+}
+
+async function fetchFinalBoard(){
+  const res = await fetch(`${LEADERBOARD_API}?action=board`);
+  return await res.json();
+}
+
+function enterLevel(levelNumber){
+  clearInterval(state.lobbyPollTimer);
+  state.currentLevelNumber = levelNumber;
+  state.round = 0;
+  state.score = 0;
+  state.correctCount = 0;
+  state.perRoundResult = [];
+  state.levelStartedAt = Date.now();
+  CASES = pickCasesForLevel(ALL_CASES, levelNumber, getUsedFiles(state.name));
+
+  el('screen-lobby').classList.add('hidden');
+  el('screen-level-complete').classList.add('hidden');
+  el('screen-game').classList.remove('hidden');
+  startRound();
+}
+
+function showFinalScreen({ heading, sub, score, rank, levelsReached, showBoard }){
+  clearInterval(state.lobbyPollTimer);
+  el('screen-lobby').classList.add('hidden');
+  el('screen-level-complete').classList.add('hidden');
+  el('screen-results').classList.remove('hidden');
+  el('final-heading').textContent = heading;
+  el('final-sub').textContent = sub;
+  el('res-score').textContent = score ?? "—";
+  el('res-rank').textContent = rank ?? "—";
+  el('res-levels').textContent = `${levelsReached}/${LEVELS.length}`;
+  if(showBoard) loadFinalBoard();
+}
+
+async function loadFinalBoard(){
+  const body = el('leaderboard-body');
+  body.innerHTML = `<tr><td colspan="4">loading…</td></tr>`;
+  if(!LEADERBOARD_API || LEADERBOARD_API.includes("PASTE_YOUR")){
+    body.innerHTML = `<tr><td colspan="4">Leaderboard API URL not set yet — see LEADERBOARD_API in the code.</td></tr>`;
+    return;
+  }
+  try{
+    const data = await fetchFinalBoard();
+    const top = (data.standings || []).slice(0, 10);
+    if(top.length === 0){
+      body.innerHTML = `<tr><td colspan="4">No finishers yet — be the first to complete all 3 rounds.</td></tr>`;
+      return;
+    }
+    body.innerHTML = top.map((e, i) => {
+      const isMe = e.name === state.name;
+      return `<tr class="${isMe ? 'me' : ''}"><td>${i+1}</td><td>${escapeHtml(e.name)}</td><td>${e.score}</td><td>${e.levelsCompleted}/${LEVELS.length}</td></tr>`;
+    }).join("");
+  }catch(e){
+    body.innerHTML = `<tr><td colspan="4">Standings unavailable right now.</td></tr>`;
+  }
+}
+
+// The core lobby state machine: asks the backend what this player should see
+// right now, and renders exactly one of: play button, waiting message,
+// elimination message, or final results.
+async function refreshLobby(){
+  clearInterval(state.lobbyPollTimer);
+  const heading = el('lobby-heading');
+  const sub = el('lobby-sub');
+  const body = el('lobby-body');
+  const playBtn = el('btn-play-level');
+  playBtn.classList.add('hidden');
+
+  if(!LEADERBOARD_API || LEADERBOARD_API.includes("PASTE_YOUR")){
+    heading.textContent = `Welcome, ${state.name}.`;
+    sub.textContent = "// no tournament backend configured — practice mode";
+    body.innerHTML = `<p style="color:var(--muted); font-size:14px; line-height:1.6;">LEADERBOARD_API isn't set, so elimination can't be checked here. You can still play any round to try it out.</p>`;
+    playBtn.textContent = "Play Round 1 (practice)";
+    playBtn.classList.remove('hidden');
+    playBtn.onclick = () => enterLevel(1);
+    return;
+  }
+
+  heading.textContent = "Checking status…";
+  sub.textContent = "// talking to the arena server";
+  body.innerHTML = "";
+
+  let info;
+  try{
+    info = await fetchWhoAmI(state.name);
+  }catch(e){
+    heading.textContent = "Couldn't reach the server.";
+    sub.textContent = "// check your connection and try again";
+    body.innerHTML = "";
+    return;
+  }
+
+  // Finished all rounds (or eliminated is handled below with nextLevel set).
+  if(info.nextLevel === null){
+    showFinalScreen({
+      heading: "Tournament complete!",
+      sub: `// ${state.name} — final results logged`,
+      score: info.cumulativeScore,
+      rank: info.finalRank,
+      levelsReached: LEVELS.length,
+      showBoard: true,
+    });
+    return;
+  }
+
+  const level = levelByNumber(info.nextLevel);
+  const levelsReached = info.completedLevels ? info.completedLevels.length : 0;
+
+  if(!info.qualified){
+    if(info.reason === "eliminated"){
+      showFinalScreen({
+        heading: "Eliminated.",
+        sub: `// didn't make the cutoff for ${level.label}`,
+        score: info.cumulativeScore,
+        rank: info.rank,
+        levelsReached,
+        showBoard: true,
+      });
+      return;
+    }
+    if(info.reason === "level_closed"){
+      heading.textContent = "You missed this round.";
+      sub.textContent = `// ${level.label} has already closed`;
+      body.innerHTML = `<p style="color:var(--muted); font-size:14px; line-height:1.6;">${level.label} closed before you submitted an entry, so you're out of the tournament. Check with the organizer if you think this is a mistake.</p>`;
+      return;
+    }
+    // status is "waiting" (round not open yet) — show a waiting state and poll.
+    heading.textContent = `Waiting for ${level.label}.`;
+    sub.textContent = `// ${state.name} — rounds completed so far: ${levelsReached}/${LEVELS.length}`;
+    const rankLine = (typeof info.rank === "number")
+      ? `<p style="color:var(--teal); font-size:14px;">You're currently ranked #${info.rank}${level.cutoff ? ` (top ${level.cutoff} advance)` : ""}.</p>`
+      : "";
+    body.innerHTML = `<p style="color:var(--muted); font-size:14px; line-height:1.6;">The organizer hasn't opened ${level.label} yet. This page checks automatically every few seconds — feel free to just wait.</p>${rankLine}`;
+    state.lobbyPollTimer = setInterval(refreshLobby, 12000);
+    return;
+  }
+
+  // Qualified and the round is open right now.
+  heading.textContent = `${level.label} is open!`;
+  const rankLine = (typeof info.rank === "number") ? ` You're ranked #${info.rank} going in.` : "";
+  sub.textContent = `// ${state.name} — get ready.${rankLine}`;
+  body.innerHTML = `<p style="color:var(--muted); font-size:14px; line-height:1.6;">${level.count} cases, 45 seconds each. Once you start, you can't pause or retry.</p>`;
+  playBtn.textContent = `Play ${level.label}`;
+  playBtn.classList.remove('hidden');
+  playBtn.onclick = () => enterLevel(level.number);
+}
+
+el('btn-start').addEventListener('click', () => {
+  const nameVal = el('player-name').value.trim();
+  if(!nameVal){
+    el('player-name').focus();
+    return;
+  }
+  state.name = nameVal;
+  el('screen-start').classList.add('hidden');
+  el('screen-lobby').classList.remove('hidden');
+  refreshLobby();
+});
+
+el('btn-hint').addEventListener('click', useHint);
+el('btn-next').addEventListener('click', nextRound);
+el('btn-continue-level').addEventListener('click', () => {
+  el('screen-level-complete').classList.add('hidden');
+  el('screen-lobby').classList.remove('hidden');
+  refreshLobby();
+});
+el('btn-refresh-lobby').addEventListener('click', refreshLobby);
+el('btn-refresh-board').addEventListener('click', loadFinalBoard);
+
+el('player-name').addEventListener('keydown', (e) => {
+  if(e.key === 'Enter') el('btn-start').click();
+});
+</script>
+</body>
+</html>
