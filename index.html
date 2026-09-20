@@ -334,10 +334,10 @@
   <div class="hero" id="screen-start">
     <h1><span class="glyph">SEGFAULT</span><span class="cursor"></span></h1>
     <h1 style="font-size:18px; font-weight:500; color:var(--muted); margin-top:2px;">the debugging duel</h1>
-    <p class="tag">// A 3-round elimination tournament. Each round is scored, ranked, and only the top scorers advance to the next round.</p>
+    <p class="tag">// A 3-round elimination tournament for grade 10 students. Each round is scored, ranked, and only the top scorers advance to the next round.</p>
 
     <div class="rules">
-      <div><span class="num">01</span> Round 1: 15 easy cases. Round 2: 8 easy + 2 medium. Round 3: 4 easy + 2 medium + 2 hard.</div>
+      <div><span class="num">01</span> Round 1: 15 cases. Round 2: 10 cases. Round 3: 8 cases — all beginner-friendly.</div>
       <div><span class="num">02</span> Rounds open and close on the organizer's schedule — you'll wait between rounds.</div>
       <div><span class="num">03</span> Only the top scorers after each round advance to the next — miss the cutoff and you're out.</div>
       <div><span class="num">04</span> 45 seconds and one submission per case. A hint is available — it costs you points.</div>
@@ -1735,24 +1735,245 @@ const ALL_CASES = [
     correct: 0,
     explain: "`items[1:3]` starts at index 1, skipping the actual first element at index 0, and returns `[20, 30]` instead of the first three items. `items[0:3]` (or `items[:3]`) starts from the beginning."
   },
+  {
+    file: "add_one.py",
+    title: "The addition that didn't stick",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def add_one(n):'},
+      {n:2, t:'    n + 1', bug:true},
+      {n:3, t:'    return n'},
+      {n:4, t:''},
+      {n:5, t:'print(add_one(5))'},
+    ],
+    hint: "`n + 1` computes a new value — but does it save that value anywhere?",
+    options: [
+      "Change `n + 1` to `n = n + 1`",
+      "Change `n + 1` to `return n + 1` and delete the line below",
+      "Change `return n` to `return n + 1`",
+      "Change `n + 1` to `n += n`",
+    ],
+    correct: 0,
+    explain: "`n + 1` on its own line computes a value and immediately throws it away — it doesn't change `n`. `n = n + 1` actually stores the result back into `n`."
+  },
+  {
+    file: "list_append_return.py",
+    title: "The list add that returned nothing",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def add_to_list(lst, item):'},
+      {n:2, t:'    return lst.append(item)', bug:true},
+      {n:3, t:''},
+      {n:4, t:'result = add_to_list([1, 2, 3], 4)'},
+      {n:5, t:'print(result)'},
+    ],
+    hint: "`.append()` changes the list in place. What does it actually hand back as its result?",
+    options: [
+      "Change to two lines: `lst.append(item)` then `return lst`",
+      "Change `lst.append(item)` to `lst + [item]`",
+      "Change `return lst.append(item)` to `return item`",
+      "Change `add_to_list([1, 2, 3], 4)` to `add_to_list([1, 2, 3, 4])`",
+    ],
+    correct: 0,
+    explain: "`list.append()` modifies the list in place and always returns `None` — it's not meant to be returned directly. Calling `.append()` on its own line, then returning `lst` afterward, gives back the actual updated list."
+  },
+  {
+    file: "grade_check.py",
+    title: "The grade that copy-pasted itself",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def get_grade(score):'},
+      {n:2, t:'    if score >= 90:'},
+      {n:3, t:'        return "A"'},
+      {n:4, t:'    if score >= 80:'},
+      {n:5, t:'        return "A"', bug:true},
+      {n:6, t:'    if score >= 70:'},
+      {n:7, t:'        return "C"'},
+      {n:8, t:'    return "F"'},
+      {n:9, t:''},
+      {n:10, t:'print(get_grade(85))'},
+    ],
+    hint: "The score bands go A, then... should the second one really say \"A\" too?",
+    options: [
+      'Change the second `return "A"` to `return "B"`',
+      'Change `if score >= 80:` to `if score >= 90:`',
+      'Change `return "C"` to `return "B"`',
+      'Change `get_grade(85)` to `get_grade(90)`',
+    ],
+    correct: 0,
+    explain: 'A score of 85 should fall in the 80–89 "B" band, but the second `if` block returns "A" again instead of "B" — a copy-paste slip. Changing it to `return "B"` fixes the grading band.'
+  },
+  {
+    file: "greet.py",
+    title: "The greeting with no space",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def greet(name, greeting="Hello"):'},
+      {n:2, t:'    return greeting + name', bug:true},
+      {n:3, t:''},
+      {n:4, t:'print(greet("Maya"))'},
+    ],
+    hint: "String concatenation with `+` doesn't add any spaces on its own — does this line add one?",
+    options: [
+      'Change `greeting + name` to `greeting + " " + name`',
+      'Change `greeting + name` to `greeting, name`',
+      'Change `greeting="Hello"` to `greeting="Hello "`',
+      'Change `return greeting + name` to `return greeting.join(name)`',
+    ],
+    correct: 0,
+    explain: '`greeting + name` jams the two strings together with nothing between them, producing "HelloMaya". Adding a space string in between (`greeting + " " + name`) fixes the spacing.'
+  },
+  {
+    file: "next_year.py",
+    title: "The age that wouldn't add up",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'age = "20"'},
+      {n:2, t:'next_year = age + 1', bug:true},
+      {n:3, t:'print(next_year)'},
+    ],
+    hint: "`age` is written in quotes — what type does that make it, and can you add a number straight to it?",
+    options: [
+      "Change `age + 1` to `int(age) + 1`",
+      'Change `age = "20"` to `age = 20`',
+      "Change `age + 1` to `age + \"1\"`",
+      "Change `next_year = age + 1` to `next_year = age.add(1)`",
+    ],
+    correct: 0,
+    explain: "`age` is a string (\"20\"), and Python won't let you add an integer directly to a string. `int(age)` converts it to a number first so the addition works."
+  },
+  {
+    file: "is_prime_small.py",
+    title: "The membership check that compared everything at once",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def is_prime_small(n):'},
+      {n:2, t:'    primes = [2, 3, 5, 7, 11]'},
+      {n:3, t:'    if n == primes:', bug:true},
+      {n:4, t:'        return True'},
+      {n:5, t:'    return False'},
+      {n:6, t:''},
+      {n:7, t:'print(is_prime_small(5))'},
+    ],
+    hint: "`n == primes` compares a single number to the *entire list* at once. Is that the same as checking whether `n` is one of the list's items?",
+    options: [
+      "Change `n == primes` to `n in primes`",
+      "Change `n == primes` to `n == primes[0]`",
+      "Change `primes = [2, 3, 5, 7, 11]` to `primes = 2, 3, 5, 7, 11`",
+      "Change `if n == primes:` to `if primes == n:`",
+    ],
+    correct: 0,
+    explain: "A single number can never equal a whole list, so `n == primes` is always False. `n in primes` correctly checks whether `n` is one of the values inside the list."
+  },
+  {
+    file: "average_of_three.py",
+    title: "The average that only divided the last number",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def average_of_three(a, b, c):'},
+      {n:2, t:'    return a + b + c / 3', bug:true},
+      {n:3, t:''},
+      {n:4, t:'print(average_of_three(3, 3, 3))'},
+    ],
+    hint: "Division happens before addition unless you say otherwise. Does `/ 3` apply to the whole sum here, or just to `c`?",
+    options: [
+      "Change `a + b + c / 3` to `(a + b + c) / 3`",
+      "Change `a + b + c / 3` to `a / 3 + b / 3 + c / 3`",
+      "Change `a + b + c / 3` to `a + b + c // 3`",
+      "Change `return a + b + c / 3` to `return (a + b + c) // 3`",
+    ],
+    correct: 0,
+    explain: "Without parentheses, Python's order of operations divides only `c` by 3 before adding `a` and `b` — not the whole sum. Wrapping the sum in parentheses, `(a + b + c) / 3`, divides the total as intended."
+  },
+  {
+    file: "print_until_five.py",
+    title: "The loop that skipped right past 5",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def print_until_five(n):'},
+      {n:2, t:'    while n != 5:', bug:true},
+      {n:3, t:'        print(n)'},
+      {n:4, t:'        n += 2'},
+      {n:5, t:''},
+      {n:6, t:'print_until_five(0)'},
+    ],
+    hint: "Starting at 0 and adding 2 each time: 0, 2, 4, 6, 8... does `n` ever land exactly on 5?",
+    options: [
+      "Change `while n != 5:` to `while n < 5:`",
+      "Change `n += 2` to `n += 1`",
+      "Change `print_until_five(0)` to `print_until_five(1)`",
+      "Change `while n != 5:` to `while n <= 5:`",
+    ],
+    correct: 0,
+    explain: "Starting at 0 and stepping by 2 only ever produces even numbers, so `n` never exactly equals 5 and the loop runs forever. Checking `n < 5` instead stops the loop once `n` passes 5, regardless of whether it lands exactly on it."
+  },
+  {
+    file: "count_positive.py",
+    title: "The counter that kept resetting itself",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def count_positive(numbers):'},
+      {n:2, t:'    count = 0'},
+      {n:3, t:'    for n in numbers:'},
+      {n:4, t:'        count = 0', bug:true},
+      {n:5, t:'        if n > 0:'},
+      {n:6, t:'            count += 1'},
+      {n:7, t:'    return count'},
+      {n:8, t:''},
+      {n:9, t:'print(count_positive([1, -2, 3, 4, -5]))'},
+    ],
+    hint: "`count` gets reset to 0 on every single pass through the loop. Does that let it ever build up past 1?",
+    options: [
+      "Delete the `count = 0` line inside the loop (keep the one before it)",
+      "Move `count = 0` to after the `if n > 0:` check",
+      "Change `count = 0` (inside the loop) to `count = count`",
+      "Change `count += 1` to `count = 1`",
+    ],
+    correct: 0,
+    explain: "Resetting `count = 0` inside the loop wipes out any progress from earlier iterations, so the final result only reflects the very last number checked. Removing that inner reset (keeping only the one before the loop starts) lets `count` actually accumulate."
+  },
+  {
+    file: "make_separator.py",
+    title: "The separator line that wouldn't print",
+    difficulty: "easy",
+    code: [
+      {n:1, t:'def make_separator(length):'},
+      {n:2, t:'    return "-" * length + 1', bug:true},
+      {n:3, t:''},
+      {n:4, t:'print(make_separator(10))'},
+    ],
+    hint: "`\"-\" * length` already builds the full string of dashes. What does adding `+ 1` at the end try to do to a string?",
+    options: [
+      'Change `"-" * length + 1` to `"-" * length`',
+      'Change `"-" * length + 1` to `"-" * (length + 1)`',
+      'Change `"-" * length + 1` to `"-" * length + "1"`',
+      'Change `return "-" * length + 1` to `return "-" * length * 1`',
+    ],
+    correct: 0,
+    explain: '`"-" * length` already produces the full separator string — the extra `+ 1` tries to add a number directly to a string, which Python doesn\'t allow. Removing the stray `+ 1` leaves just the intended repeated-dash string.'
+  },
 ];
 
-// Three sequential rounds, each with its own mix of difficulties and its own
-// size. Rounds are gated by the organizer via the backend: a round must be
+// Three sequential rounds. All cases are "easy" difficulty — this
+// competition is aimed at grade 10 students, so no medium/hard cases are
+// drawn. Rounds are gated by the organizer via the backend: a round must be
 // marked "open" there before anyone can play it, and advancing past Round 1
 // or Round 2 requires ranking inside that round's cutoff (checked server-side).
 const LEVELS = [
   { number: 1, label: "Round 1 — Warm-up",       composition: { easy: 15 } },
-  { number: 2, label: "Round 2 — Stepping Up",   composition: { easy: 8, medium: 2 } },
-  { number: 3, label: "Round 3 — Final Stretch", composition: { easy: 4, medium: 2, hard: 2 } },
+  { number: 2, label: "Round 2 — Stepping Up",   composition: { easy: 10 } },
+  { number: 3, label: "Round 3 — Final Stretch", composition: { easy: 8 } },
 ];
 LEVELS.forEach(level => {
   level.count = Object.values(level.composition).reduce((sum, n) => sum + n, 0);
 });
 function levelByNumber(n){ return LEVELS.find(l => l.number === n); }
 
-// Later rounds are worth more per correct answer, on top of the speed bonus.
+// All cases are "easy" now, so a difficulty-based multiplier would always be
+// 1x and do nothing — instead, later ROUNDS are worth more per correct
+// answer, on top of the speed bonus, so Round 3 still feels higher-stakes.
 const DIFFICULTY_MULTIPLIER = { easy: 1, medium: 1.3, hard: 1.6 };
+const ROUND_MULTIPLIER = { 1: 1, 2: 1.2, 3: 1.5 };
 let CASES = [];
 
 function shuffleArray(arr){
@@ -1999,7 +2220,7 @@ function submitAnswer(idx){
 
   if(idx === c.correct){
     let pts = Math.max(20, Math.round(100 - elapsed * 1.5));
-    pts = Math.round(pts * DIFFICULTY_MULTIPLIER[c.difficulty]);
+    pts = Math.round(pts * DIFFICULTY_MULTIPLIER[c.difficulty] * ROUND_MULTIPLIER[state.currentLevelNumber]);
     if(state.hintUsed) pts = Math.round(pts * 0.6);
     state.score += pts;
     state.correctCount += 1;
