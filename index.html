@@ -2414,10 +2414,22 @@ async function refreshLobby(){
   try{
     info = await fetchWhoAmI(state.enrollmentNo);
   }catch(e){
-    heading.textContent = "Couldn't reach the server.";
-    sub.textContent = "// check your connection and try again";
-    body.innerHTML = "";
-    return;
+    // One quick retry before giving up — under heavy load (e.g. many
+    // participants polling at once) a single request can fail transiently
+    // even though the backend is fine a moment later.
+    try{
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      info = await fetchWhoAmI(state.enrollmentNo);
+    }catch(e2){
+      heading.textContent = "Couldn't reach the server.";
+      sub.textContent = "// this can happen briefly under heavy load — retrying automatically";
+      body.innerHTML = "";
+      // Keep trying in the background with jitter, rather than leaving the
+      // student stuck on an error screen until they notice and click refresh.
+      const retryDelay = 15000 + Math.floor(Math.random() * 6000);
+      state.lobbyPollTimer = setInterval(refreshLobby, retryDelay);
+      return;
+    }
   }
 
   // Finished all rounds (or eliminated is handled below with nextLevel set).
@@ -2460,8 +2472,14 @@ async function refreshLobby(){
     const rankLine = (typeof info.rank === "number")
       ? `<p style="color:var(--teal); font-size:14px;">You're currently ranked #${info.rank}${level.cutoff ? ` (top ${level.cutoff} advance)` : ""}.</p>`
       : "";
-    body.innerHTML = `<p style="color:var(--muted); font-size:14px; line-height:1.6;">The organizer hasn't opened ${level.label} yet. This page checks automatically every few seconds — feel free to just wait.</p>${rankLine}`;
-    state.lobbyPollTimer = setInterval(refreshLobby, 12000);
+    body.innerHTML = `<p style="color:var(--muted); font-size:14px; line-height:1.6;">The organizer hasn't opened ${level.label} yet. This page checks automatically every so often — feel free to just wait.</p>${rankLine}`;
+    // Randomized interval (20–28s) rather than a fixed one: with many
+    // participants all waiting together, a fixed interval makes everyone's
+    // poll requests cluster into simultaneous bursts. Jitter spreads them
+    // out into a smooth trickle instead, which the backend handles far
+    // better at scale (e.g. 100 participants waiting at once).
+    const pollDelay = 20000 + Math.floor(Math.random() * 8000);
+    state.lobbyPollTimer = setInterval(refreshLobby, pollDelay);
     return;
   }
 
