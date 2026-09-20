@@ -343,7 +343,8 @@
       <div><span class="num">04</span> 45 seconds and one submission per case. A hint is available — it costs you points.</div>
     </div>
 
-    <input type="text" id="player-name" placeholder="Enter your name / team tag" maxlength="24">
+    <input type="text" id="player-enrollment" placeholder="Enrollment number" maxlength="24" style="margin-bottom:10px;">
+    <input type="text" id="player-name" placeholder="Full name" maxlength="40">
     <button class="btn-primary" id="btn-start" style="width:100%;">Check tournament status</button>
   </div>
 
@@ -419,7 +420,7 @@
     <div class="leaderboard">
       <h3 id="final-board-heading">// standings — top 10</h3>
       <table>
-        <thead><tr><th>#</th><th>name</th><th>score</th><th>rounds</th></tr></thead>
+        <thead><tr><th>#</th><th>enrollment</th><th>name</th><th>score</th><th>rounds</th></tr></thead>
         <tbody id="leaderboard-body"></tbody>
       </table>
     </div>
@@ -2002,19 +2003,20 @@ function pickCasesForLevel(pool, levelNumber, excludeFiles){
 }
 
 // --- Local (per-browser) memory of which case files this player has already
-// seen, keyed by name. This is a convenience to avoid repeat questions across
-// rounds — the authoritative record of scores/progress lives on the backend.
-function usedFilesKey(name){ return `segfault_used_${name}`; }
-function getUsedFiles(name){
+// seen, keyed by enrollment number (the unique identity). This is a
+// convenience to avoid repeat questions across rounds — the authoritative
+// record of scores/progress lives on the backend.
+function usedFilesKey(enrollmentNo){ return `segfault_used_${enrollmentNo}`; }
+function getUsedFiles(enrollmentNo){
   try{
-    const raw = localStorage.getItem(usedFilesKey(name));
+    const raw = localStorage.getItem(usedFilesKey(enrollmentNo));
     return raw ? JSON.parse(raw) : [];
   }catch(e){ return []; }
 }
-function addUsedFiles(name, files){
+function addUsedFiles(enrollmentNo, files){
   try{
-    const existing = getUsedFiles(name);
-    localStorage.setItem(usedFilesKey(name), JSON.stringify(existing.concat(files)));
+    const existing = getUsedFiles(enrollmentNo);
+    localStorage.setItem(usedFilesKey(enrollmentNo), JSON.stringify(existing.concat(files)));
   }catch(e){ /* storage unavailable — non-critical, just means possible repeats */ }
 }
 
@@ -2024,10 +2026,11 @@ const ROUND_SECONDS = 45;
 // Deploy > New deployment > Web app > Execute as Me > Access: Anyone.
 // Leave the placeholder as-is to run the game in unrestricted practice mode
 // (no elimination — anyone can play any round any time).
-const LEADERBOARD_API = "https://script.google.com/macros/s/AKfycby8oYZN4FKIAfOek3n4ABUnfnF3188SH-ccm4KBDYhTF8J6vIRAuedSePujU3gVyQ-j/exec";
+const LEADERBOARD_API = "https://script.google.com/macros/library/d/15TLL9Emn02XKlBNwWYQSkS7cb085Qfsl6d2-sDtcyBDPlnXOgNZtFMwn/4";
 
 let state = {
   name: "",
+  enrollmentNo: "",
   currentLevelNumber: null,
   round: 0,
   score: 0,
@@ -2282,7 +2285,7 @@ async function finishLevel(){
   const level = levelByNumber(state.currentLevelNumber);
   const totalTime = Math.round((Date.now() - state.levelStartedAt) / 1000);
 
-  addUsedFiles(state.name, CASES.map(c => c.file));
+  addUsedFiles(state.enrollmentNo, CASES.map(c => c.file));
 
   el('screen-game').classList.add('hidden');
   el('screen-level-complete').classList.remove('hidden');
@@ -2292,7 +2295,7 @@ async function finishLevel(){
   el('lc-points').textContent = state.score;
   el('lc-total').textContent = "…";
 
-  const result = await submitLevelScore(state.name, level.number, state.score, state.correctCount, totalTime);
+  const result = await submitLevelScore(state.enrollmentNo, state.name, level.number, state.score, state.correctCount, totalTime);
   if(result && typeof result.cumulativeScore === "number"){
     el('lc-total').textContent = result.cumulativeScore;
   } else {
@@ -2300,7 +2303,7 @@ async function finishLevel(){
   }
 }
 
-async function submitLevelScore(name, level, score, correct, time){
+async function submitLevelScore(enrollmentNo, name, level, score, correct, time){
   if(!LEADERBOARD_API || LEADERBOARD_API.includes("PASTE_YOUR")){
     console.warn("Leaderboard API URL not set — practice mode, nothing submitted.");
     return null;
@@ -2311,7 +2314,7 @@ async function submitLevelScore(name, level, score, correct, time){
     // avoids that entirely while Apps Script still parses the JSON body fine.
     const res = await fetch(LEADERBOARD_API, {
       method: "POST",
-      body: JSON.stringify({ action: "submit", name, level, score, correct, time }),
+      body: JSON.stringify({ action: "submit", enrollmentNo, name, level, score, correct, time }),
     });
     return await res.json();
   }catch(e){
@@ -2320,8 +2323,8 @@ async function submitLevelScore(name, level, score, correct, time){
   }
 }
 
-async function fetchWhoAmI(name){
-  const res = await fetch(`${LEADERBOARD_API}?action=whoami&name=${encodeURIComponent(name)}`);
+async function fetchWhoAmI(enrollmentNo){
+  const res = await fetch(`${LEADERBOARD_API}?action=whoami&enrollmentNo=${encodeURIComponent(enrollmentNo)}`);
   return await res.json();
 }
 
@@ -2338,7 +2341,7 @@ function enterLevel(levelNumber){
   state.correctCount = 0;
   state.perRoundResult = [];
   state.levelStartedAt = Date.now();
-  CASES = pickCasesForLevel(ALL_CASES, levelNumber, getUsedFiles(state.name));
+  CASES = pickCasesForLevel(ALL_CASES, levelNumber, getUsedFiles(state.enrollmentNo));
 
   el('screen-lobby').classList.add('hidden');
   el('screen-level-complete').classList.add('hidden');
@@ -2361,24 +2364,24 @@ function showFinalScreen({ heading, sub, score, rank, levelsReached, showBoard }
 
 async function loadFinalBoard(){
   const body = el('leaderboard-body');
-  body.innerHTML = `<tr><td colspan="4">loading…</td></tr>`;
+  body.innerHTML = `<tr><td colspan="5">loading…</td></tr>`;
   if(!LEADERBOARD_API || LEADERBOARD_API.includes("PASTE_YOUR")){
-    body.innerHTML = `<tr><td colspan="4">Leaderboard API URL not set yet — see LEADERBOARD_API in the code.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="5">Leaderboard API URL not set yet — see LEADERBOARD_API in the code.</td></tr>`;
     return;
   }
   try{
     const data = await fetchFinalBoard();
     const top = (data.standings || []).slice(0, 10);
     if(top.length === 0){
-      body.innerHTML = `<tr><td colspan="4">No finishers yet — be the first to complete all 3 rounds.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="5">No finishers yet — be the first to complete all 3 rounds.</td></tr>`;
       return;
     }
     body.innerHTML = top.map((e, i) => {
-      const isMe = e.name === state.name;
-      return `<tr class="${isMe ? 'me' : ''}"><td>${i+1}</td><td>${escapeHtml(e.name)}</td><td>${e.score}</td><td>${e.levelsCompleted}/${LEVELS.length}</td></tr>`;
+      const isMe = e.enrollmentNo === state.enrollmentNo;
+      return `<tr class="${isMe ? 'me' : ''}"><td>${i+1}</td><td>${escapeHtml(e.enrollmentNo)}</td><td>${escapeHtml(e.name)}</td><td>${e.score}</td><td>${e.levelsCompleted}/${LEVELS.length}</td></tr>`;
     }).join("");
   }catch(e){
-    body.innerHTML = `<tr><td colspan="4">Standings unavailable right now.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="5">Standings unavailable right now.</td></tr>`;
   }
 }
 
@@ -2409,7 +2412,7 @@ async function refreshLobby(){
 
   let info;
   try{
-    info = await fetchWhoAmI(state.name);
+    info = await fetchWhoAmI(state.enrollmentNo);
   }catch(e){
     heading.textContent = "Couldn't reach the server.";
     sub.textContent = "// check your connection and try again";
@@ -2473,11 +2476,17 @@ async function refreshLobby(){
 }
 
 el('btn-start').addEventListener('click', () => {
+  const enrollmentVal = el('player-enrollment').value.trim();
   const nameVal = el('player-name').value.trim();
+  if(!enrollmentVal){
+    el('player-enrollment').focus();
+    return;
+  }
   if(!nameVal){
     el('player-name').focus();
     return;
   }
+  state.enrollmentNo = enrollmentVal;
   state.name = nameVal;
   el('screen-start').classList.add('hidden');
   el('screen-lobby').classList.remove('hidden');
@@ -2494,6 +2503,9 @@ el('btn-continue-level').addEventListener('click', () => {
 el('btn-refresh-lobby').addEventListener('click', refreshLobby);
 el('btn-refresh-board').addEventListener('click', loadFinalBoard);
 
+el('player-enrollment').addEventListener('keydown', (e) => {
+  if(e.key === 'Enter') el('player-name').focus();
+});
 el('player-name').addEventListener('keydown', (e) => {
   if(e.key === 'Enter') el('btn-start').click();
 });
