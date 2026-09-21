@@ -180,6 +180,7 @@
     border-radius:3px;
     border:1px solid;
   }
+  .diff-badge.easiest{ color:#7fe0b8; border-color:#7fe0b8; background:rgba(127,224,184,0.08); }
   .diff-badge.easy{ color:var(--teal); border-color:var(--teal); background:rgba(61,220,151,0.08); }
   .diff-badge.medium{ color:var(--amber); border-color:var(--amber); background:rgba(255,176,32,0.08); }
   .diff-badge.hard{ color:var(--red); border-color:var(--red); background:rgba(255,92,92,0.08); }
@@ -337,7 +338,7 @@
     <p class="tag">// A 3-round elimination tournament for grade 10 students. Each round is scored, ranked, and only the top scorers advance to the next round.</p>
 
     <div class="rules">
-      <div><span class="num">01</span> Round 1: 15 cases. Round 2: 10 cases. Round 3: 8 cases — all beginner-friendly.</div>
+      <div><span class="num">01</span> Round 1: 15 cases, mostly the easiest ones. Round 2: 10 cases. Round 3: 8 cases.</div>
       <div><span class="num">02</span> Rounds open and close on the organizer's schedule — you'll wait between rounds.</div>
       <div><span class="num">03</span> Only the top scorers after each round advance to the next — miss the cutoff and you're out.</div>
       <div><span class="num">04</span> 45 seconds and one submission per case. A hint is available — it costs you points.</div>
@@ -441,7 +442,7 @@ const ALL_CASES = [
   {
     file: "avg_grade.py",
     title: "The vanishing average",
-    difficulty: "easy",
+    difficulty: "easiest",
     code: [
       {n:1, t:'def average(scores):'},
       {n:2, t:'    total = 0', bug:false},
@@ -484,7 +485,7 @@ const ALL_CASES = [
   {
     file: "guest_list.py",
     title: "The off-by-one gate",
-    difficulty: "easy",
+    difficulty: "easiest",
     code: [
       {n:1, t:'names = ["Ana", "Ravi", "Zoe", "Ken"]'},
       {n:2, t:'for i in range(1, len(names)):', bug:true},
@@ -524,7 +525,7 @@ const ALL_CASES = [
   {
     file: "is_even.py",
     title: "The stubborn checker",
-    difficulty: "easy",
+    difficulty: "easiest",
     code: [
       {n:1, t:'def is_even(n):'},
       {n:2, t:'    if n % 2 = 0:', bug:true},
@@ -544,7 +545,7 @@ const ALL_CASES = [
   {
     file: "countdown.py",
     title: "The loop that never ends",
-    difficulty: "easy",
+    difficulty: "easiest",
     code: [
       {n:1, t:'def countdown(n):'},
       {n:2, t:'    while n > 0:'},
@@ -565,7 +566,7 @@ const ALL_CASES = [
   {
     file: "word_lengths.py",
     title: "The index that ran off the page",
-    difficulty: "easy",
+    difficulty: "easiest",
     code: [
       {n:1, t:'words = ["sun", "moon", "star"]'},
       {n:2, t:'for i in range(len(words) + 1):', bug:true},
@@ -666,7 +667,7 @@ const ALL_CASES = [
   {
     file: "string_multiply.py",
     title: "The receipt that won't print",
-    difficulty: "easy",
+    difficulty: "easiest",
     code: [
       {n:1, t:'def make_receipt(item, price):'},
       {n:2, t:'    return item + ": Rs " + price', bug:true},
@@ -752,7 +753,7 @@ const ALL_CASES = [
   {
     file: "divide_safely.py",
     title: "The empty-list average",
-    difficulty: "easy",
+    difficulty: "easiest",
     code: [
       {n:1, t:'def average(total, count):'},
       {n:2, t:'    return total / count', bug:true},
@@ -857,7 +858,7 @@ const ALL_CASES = [
   {
     file: "string_format_bug.py",
     title: "The template that never filled in",
-    difficulty: "easy",
+    difficulty: "easiest",
     code: [
       {n:1, t:'name = "Maya"'},
       {n:2, t:'score = 95'},
@@ -1031,7 +1032,7 @@ const ALL_CASES = [
   {
     file: "running_total.py",
     title: "The receipt printed once",
-    difficulty: "easy",
+    difficulty: "easiest",
     code: [
       {n:1, t:'def print_receipt(items):'},
       {n:2, t:'    total = 0'},
@@ -1426,7 +1427,7 @@ const ALL_CASES = [
   {
     file: "add_numbers.py",
     title: "The function that forgot to answer",
-    difficulty: "easy",
+    difficulty: "easiest",
     code: [
       {n:1, t:'def add(a, b):'},
       {n:2, t:'    result = a + b', bug:true},
@@ -1446,7 +1447,7 @@ const ALL_CASES = [
   {
     file: "first_item.py",
     title: "The first fruit that wasn't first",
-    difficulty: "easy",
+    difficulty: "easiest",
     code: [
       {n:1, t:'fruits = ["apple", "banana", "cherry"]'},
       {n:2, t:'print("First fruit:", fruits[1])', bug:true},
@@ -1487,7 +1488,7 @@ const ALL_CASES = [
   {
     file: "join_words.py",
     title: "The sentence that lost its words",
-    difficulty: "easy",
+    difficulty: "easiest",
     code: [
       {n:1, t:'def join_words(words):'},
       {n:2, t:'    sentence = ""'},
@@ -1510,7 +1511,7 @@ const ALL_CASES = [
   {
     file: "count_items.py",
     title: "The undefined counter",
-    difficulty: "easy",
+    difficulty: "easiest",
     code: [
       {n:1, t:'numbers = [4, 8, 15, 16, 23, 42]'},
       {n:2, t:'print("Total items:", length(numbers))', bug:true},
@@ -1550,7 +1551,7 @@ const ALL_CASES = [
   {
     file: "double_all.py",
     title: "The one-too-far index",
-    difficulty: "easy",
+    difficulty: "easiest",
     code: [
       {n:1, t:'def double_all(numbers):'},
       {n:2, t:'    return [n * 2 for n in numbers]'},
@@ -1596,7 +1597,7 @@ const ALL_CASES = [
   {
     file: "times_table.py",
     title: "The table that stopped one row early",
-    difficulty: "easy",
+    difficulty: "easiest",
     code: [
       {n:1, t:'for i in range(1, 5):', bug:true},
       {n:2, t:'    print(f"3 x {i} = {3 * i}")'},
@@ -1637,7 +1638,7 @@ const ALL_CASES = [
   {
     file: "get_initial.py",
     title: "The initial that missed the first letter",
-    difficulty: "easy",
+    difficulty: "easiest",
     code: [
       {n:1, t:'def get_initial(name):'},
       {n:2, t:'    return name[1]', bug:true},
@@ -1701,7 +1702,7 @@ const ALL_CASES = [
   {
     file: "find_maximum.py",
     title: "The maximum that reported the minimum",
-    difficulty: "easy",
+    difficulty: "easiest",
     code: [
       {n:1, t:'numbers = [3, 7, 2, 9, 4]'},
       {n:2, t:'print("Maximum:", min(numbers))', bug:true},
@@ -1739,7 +1740,7 @@ const ALL_CASES = [
   {
     file: "add_one.py",
     title: "The addition that didn't stick",
-    difficulty: "easy",
+    difficulty: "easiest",
     code: [
       {n:1, t:'def add_one(n):'},
       {n:2, t:'    n + 1', bug:true},
@@ -1781,7 +1782,7 @@ const ALL_CASES = [
   {
     file: "grade_check.py",
     title: "The grade that copy-pasted itself",
-    difficulty: "easy",
+    difficulty: "easiest",
     code: [
       {n:1, t:'def get_grade(score):'},
       {n:2, t:'    if score >= 90:'},
@@ -1807,7 +1808,7 @@ const ALL_CASES = [
   {
     file: "greet.py",
     title: "The greeting with no space",
-    difficulty: "easy",
+    difficulty: "easiest",
     code: [
       {n:1, t:'def greet(name, greeting="Hello"):'},
       {n:2, t:'    return greeting + name', bug:true},
@@ -1827,7 +1828,7 @@ const ALL_CASES = [
   {
     file: "next_year.py",
     title: "The age that wouldn't add up",
-    difficulty: "easy",
+    difficulty: "easiest",
     code: [
       {n:1, t:'age = "20"'},
       {n:2, t:'next_year = age + 1', bug:true},
@@ -1936,7 +1937,7 @@ const ALL_CASES = [
   {
     file: "make_separator.py",
     title: "The separator line that wouldn't print",
-    difficulty: "easy",
+    difficulty: "easiest",
     code: [
       {n:1, t:'def make_separator(length):'},
       {n:2, t:'    return "-" * length + 1', bug:true},
@@ -1955,25 +1956,41 @@ const ALL_CASES = [
   },
 ];
 
-// Three sequential rounds. All cases are "easy" difficulty — this
-// competition is aimed at grade 10 students, so no medium/hard cases are
-// drawn. Rounds are gated by the organizer via the backend: a round must be
-// marked "open" there before anyone can play it, and advancing past Round 1
-// or Round 2 requires ranking inside that round's cutoff (checked server-side).
+// Three sequential rounds, aimed at grade 10 students. Round 1 leans heavily
+// on the "easiest" tier (single-glance-obvious bugs) to warm players up;
+// Rounds 2 and 3 draw from the full easy-tier pool (easiest + easy combined).
+// No medium/hard cases are drawn anywhere. Rounds are gated by the organizer
+// via the backend: a round must be marked "open" there before anyone can
+// play it, and advancing past Round 1 or Round 2 requires ranking inside
+// that round's cutoff (checked server-side).
 const LEVELS = [
-  { number: 1, label: "Round 1 — Warm-up",       composition: { easy: 15 } },
-  { number: 2, label: "Round 2 — Stepping Up",   composition: { easy: 10 } },
-  { number: 3, label: "Round 3 — Final Stretch", composition: { easy: 8 } },
+  {
+    number: 1, label: "Round 1 — Warm-up",
+    // 14 of 15 (~93%, the closest whole-number split to the intended ~90%)
+    // drawn from "easiest" specifically; the rest from the wider easy pool.
+    composition: [
+      { difficulties: ["easiest"], count: 14 },
+      { difficulties: ["easy"], count: 1 },
+    ],
+  },
+  {
+    number: 2, label: "Round 2 — Stepping Up",
+    composition: [ { difficulties: ["easiest", "easy"], count: 10 } ],
+  },
+  {
+    number: 3, label: "Round 3 — Final Stretch",
+    composition: [ { difficulties: ["easiest", "easy"], count: 8 } ],
+  },
 ];
 LEVELS.forEach(level => {
-  level.count = Object.values(level.composition).reduce((sum, n) => sum + n, 0);
+  level.count = level.composition.reduce((sum, entry) => sum + entry.count, 0);
 });
 function levelByNumber(n){ return LEVELS.find(l => l.number === n); }
 
-// All cases are "easy" now, so a difficulty-based multiplier would always be
-// 1x and do nothing — instead, later ROUNDS are worth more per correct
-// answer, on top of the speed bonus, so Round 3 still feels higher-stakes.
-const DIFFICULTY_MULTIPLIER = { easy: 1, medium: 1.3, hard: 1.6 };
+// All cases are easy-tier now, so a difficulty-based multiplier would mostly
+// do nothing — instead, later ROUNDS are worth more per correct answer, on
+// top of the speed bonus, so Round 3 still feels higher-stakes.
+const DIFFICULTY_MULTIPLIER = { easiest: 1, easy: 1, medium: 1.3, hard: 1.6 };
 const ROUND_MULTIPLIER = { 1: 1, 2: 1.2, 3: 1.5 };
 let CASES = [];
 
@@ -1989,13 +2006,14 @@ function shuffleArray(arr){
 // Draws one round's composition from the pool, excluding any case file this
 // player has already seen in an earlier round (tracked in localStorage so it
 // survives the page reload that happens during the real-world break between
-// rounds).
+// rounds). Each composition entry specifies a set of acceptable difficulty
+// tags and how many cases to draw from that combined set.
 function pickCasesForLevel(pool, levelNumber, excludeFiles){
   const level = levelByNumber(levelNumber);
   const exclude = new Set(excludeFiles || []);
   const levelCases = [];
-  Object.entries(level.composition).forEach(([difficulty, count]) => {
-    const available = pool.filter(c => c.difficulty === difficulty && !exclude.has(c.file));
+  level.composition.forEach(({ difficulties, count }) => {
+    const available = pool.filter(c => difficulties.includes(c.difficulty) && !exclude.has(c.file) && !levelCases.includes(c));
     const picks = shuffleArray(available).slice(0, count);
     levelCases.push(...picks);
   });
